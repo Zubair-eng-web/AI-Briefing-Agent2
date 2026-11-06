@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.env
+*.db
+.DS_Store
+.vscode/
+preview.htmlpreview.html
+alert_preview.html
+.pytest_cache/
+preview.html
+*.log
+.streamlit/secrets.toml
