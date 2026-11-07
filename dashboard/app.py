@@ -11,12 +11,35 @@ except ModuleNotFoundError:  # "streamlit run dashboard/app.py" me project root 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from dashboard import api_client, utils
 
+import hmac
+
+from app.core.config import settings
+
 PRIORITIES = ["Critical", "High", "Medium", "Low"]
 SENTIMENTS = ["positive", "negative", "neutral"]
 
 st.set_page_config(page_title="AI Briefing Agent", layout="wide")
 st.title("AI Briefing Agent")
 st.caption("Khabrein, priority, sentiment aur research chat, sab ek jagah.")
+
+
+def require_password():
+    """DASHBOARD_PASSWORD set ho to bina password ke dashboard nahi khulta."""
+    password = settings.dashboard_password
+    if not password or st.session_state.get("authed"):
+        return
+    holder = st.empty()
+    entered = holder.text_input("Password", type="password")
+    if entered and hmac.compare_digest(entered.encode(), password.encode()):
+        st.session_state.authed = True
+        holder.empty()
+        return
+    if entered:
+        st.error("Ghalat password")
+    st.stop()
+
+
+require_password()
 
 try:
     api_client.health()

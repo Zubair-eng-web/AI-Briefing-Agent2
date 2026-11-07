@@ -2,6 +2,8 @@ import os
 
 import httpx
 
+from app.core.config import settings
+
 DEFAULT_URL = "http://127.0.0.1:8000"
 _transport = None  # tests yahan fake transport lagate hain
 
@@ -26,7 +28,10 @@ def _detail(response: httpx.Response) -> str:
 
 def _request(method: str, path: str, timeout: float = 20.0, **kwargs):
     try:
-        with httpx.Client(base_url=base_url(), timeout=timeout, transport=_transport) as client:
+        headers = {"X-API-Key": settings.api_key} if settings.api_key else {}
+        with httpx.Client(
+            base_url=base_url(), timeout=timeout, transport=_transport, headers=headers
+        ) as client:
             response = client.request(method, path, **kwargs)
     except httpx.ConnectError:
         raise ApiError(

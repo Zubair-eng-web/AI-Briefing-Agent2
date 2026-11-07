@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Database: default SQLite. Docker/Render me PostgreSQL URL milta hai
     database_url: str = "sqlite:///briefing.db"
 
+    # Security (khali = band, local development ke liye)
+    api_key: str = ""
+    dashboard_password: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
