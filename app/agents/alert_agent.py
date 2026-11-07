@@ -4,6 +4,7 @@ from email.message import EmailMessage
 from html import escape
 
 from app.core.config import settings
+from app.core.mailer import deliver
 from app.core.story import Story
 
 
@@ -60,15 +61,10 @@ def build_alert_message(stories: list[Story], sender: str, receiver: str) -> Ema
 def send_alert(stories: list[Story], smtp_class=None) -> None:
     if not stories:
         return
-    if not (settings.email_sender and settings.email_password and settings.email_receiver):
-        raise ValueError("EMAIL_SENDER / EMAIL_PASSWORD / EMAIL_RECEIVER .env me set nahi hain")
-
-    msg = build_alert_message(stories, settings.email_sender, settings.email_receiver)
-    smtp_class = smtp_class or smtplib.SMTP_SSL
-    context = ssl.create_default_context()
-    with smtp_class("smtp.gmail.com", 465, context=context, timeout=30) as server:
-        server.login(settings.email_sender, settings.email_password)
-        server.send_message(msg)
+    deliver(
+        lambda sender, receiver: build_alert_message(stories, sender, receiver),
+        smtp_class=smtp_class,
+    )
 
 
 if __name__ == "__main__":

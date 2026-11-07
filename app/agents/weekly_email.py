@@ -6,6 +6,7 @@ from html import escape
 
 from app.agents.email_agent import PRIORITY_COLORS, SENTIMENT_COLORS, _safe_link, build_videos_html
 from app.core.config import settings
+from app.core.mailer import deliver
 from app.core.story import PRIORITIES, SENTIMENTS
 
 STATUS_COLORS = {"new": "#2f855a", "rising": "#dd6b20", "falling": "#718096", "steady": "#4a5568"}
@@ -195,12 +196,7 @@ def build_weekly_message(report: dict, sender: str, receiver: str) -> EmailMessa
 
 
 def send_weekly_email(report: dict, smtp_class=None) -> None:
-    if not (settings.email_sender and settings.email_password and settings.email_receiver):
-        raise ValueError("EMAIL_SENDER / EMAIL_PASSWORD / EMAIL_RECEIVER .env me set nahi hain")
-
-    msg = build_weekly_message(report, settings.email_sender, settings.email_receiver)
-    smtp_class = smtp_class or smtplib.SMTP_SSL
-    context = ssl.create_default_context()
-    with smtp_class("smtp.gmail.com", 465, context=context, timeout=30) as server:
-        server.login(settings.email_sender, settings.email_password)
-        server.send_message(msg)
+    deliver(
+        lambda sender, receiver: build_weekly_message(report, sender, receiver),
+        smtp_class=smtp_class,
+    )

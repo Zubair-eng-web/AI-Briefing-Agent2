@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     api_key: str = ""
     dashboard_password: str = ""
 
+    # Email HTTPS API se (cloud ke liye). Khali = Gmail SMTP (local)
+    resend_api_key: str = ""
+    resend_from: str = "AI Briefing <onboarding@resend.dev>"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
