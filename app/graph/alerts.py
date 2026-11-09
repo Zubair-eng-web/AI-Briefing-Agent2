@@ -3,7 +3,7 @@ from typing import Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.agents.alert_agent import send_alert
+from app.agents.alert_agent import send_alert, send_telegram_alert
 from app.agents.analyzer import analyze_stories
 from app.agents.factchecker import check_credibility
 from app.agents.summarizer import get_client
@@ -40,6 +40,7 @@ def build_alert_graph(
     collector=collect_all,
     saver=save_new_articles,
     alert_sender=send_alert,
+    telegram_sender=send_telegram_alert,
     alert_filter=filter_unalerted,
     alert_marker=mark_alerted,
     limit_per_feed: int = 5,
@@ -82,6 +83,7 @@ def build_alert_graph(
 
     def alert_node(state: AlertState):
         alert_sender(state["alerts"])
+        telegram_sender(state["alerts"])  # Telegram fail ho to bhi pipeline nahi rukti
         alert_marker(state["alerts"])  # sirf email jaane ke baad mark hota hai
         return {"trace": [f"alert: breaking alert sent for {len(state['alerts'])} stories"]}
 
@@ -111,6 +113,7 @@ if __name__ == "__main__":
             f"(alert skip ki gayi: --no-email, {len(stories)} critical stories)"
         )
         options["alert_marker"] = lambda stories: None
+        options["telegram_sender"] = lambda stories: None
 
     result = run_alert_check(**options)
 

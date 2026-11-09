@@ -6,6 +6,7 @@ from html import escape
 from app.core.config import settings
 from app.core.mailer import deliver
 from app.core.story import Story
+from app.core.telegram_notifier import TelegramNotifier
 
 
 def build_alert_html(stories: list[Story]) -> str:
@@ -65,6 +66,38 @@ def send_alert(stories: list[Story], smtp_class=None) -> None:
         lambda sender, receiver: build_alert_message(stories, sender, receiver),
         smtp_class=smtp_class,
     )
+
+
+MAX_TELEGRAM_ALERTS = 5
+
+
+def build_telegram_text(story: Story) -> str:
+    parts = [f"BREAKING: {' '.join(story.title.split())}", "", story.summary.strip(), ""]
+    if story.credibility:
+        parts.append(story.credibility)
+    if story.sources:
+        parts.append(story.sources[0][1])
+    return "\n".join(parts)
+
+
+def send_telegram_alert(stories: list[Story], notifier=None) -> int:
+    """Critical stories Telegram par bhejta hai. Kabhi exception nahi deta.
+
+    Return: kitne messages gaye. Token/chat id na ho to chupchap 0.
+    """
+    if not stories:
+        return 0
+    try:
+        notifier = notifier or TelegramNotifier.from_env()
+        if not notifier.enabled:
+            return 0
+        sent = 0
+        for story in stories[:MAX_TELEGRAM_ALERTS]:
+            if notifier.send(build_telegram_text(story)):
+                sent += 1
+        return sent
+    except Exception:
+        return 0
 
 
 if __name__ == "__main__":

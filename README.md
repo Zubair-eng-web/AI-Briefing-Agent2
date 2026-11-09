@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts and a weekly intelligence report by email. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end on a local machine, covered by 198 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
+**Status:** working end to end on a local machine, covered by 232 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
 
 ## Project summary
 
@@ -108,7 +108,8 @@ The project was built step by step, and each step was tested before moving on.
 | 21a | Docker and PostgreSQL support | Dockerfile, Compose file, database URL handling (the Compose stack is not yet verified end to end on the development machine) |
 | 21b-0 | GitHub | Repository, README, `.env.example`, secret scan before pushing |
 | 22 | CI | GitHub Actions workflow running the test suite on every push |
-| 23 | Telegram notifier | Standalone notifier module with offline tests (not yet wired into the alert pipeline) |
+| 23 | Telegram notifier | Standalone notifier module with offline tests |
+| 24 | Telegram alerts | Critical stories are also sent to Telegram after the email; Telegram failures never block the pipeline, and tests can never send real messages |
 
 ### Remaining roadmap
 
@@ -120,14 +121,14 @@ The project was built step by step, and each step was tested before moving on.
 | 4 | Social media sources | X, Facebook and Instagram APIs are paid or restricted; start with sources that have open official APIs |
 | 5 | Claim-level fact-checking | An agent that compares individual claims across sources |
 | 6 | Research agent | Multi-step deep dives on a topic |
-| 7 | More notification channels | For example Telegram for breaking alerts |
-| 8 | CI and demo | GitHub Actions running the tests, screenshots in the README |
+| 7 | More notification channels | Telegram is done; others (for example Slack) could follow |
+| 8 | Demo | Screenshots in the README (CI is done) |
 
 ## Design decisions
 
 - **One LLM call for analysis:** all stories are classified together, which keeps free-tier quota usage low; a malformed answer falls back to safe defaults instead of breaking the pipeline.
 - **Idempotent by design:** database tables remember which articles were digested and which stories were alerted, so reruns never repeat an email.
-- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 198 tests run offline with fakes.
+- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 232 tests run offline with fakes.
 - **Honest answers:** the research chat refuses when retrieval finds nothing relevant, and the prompt treats retrieved text as data, never as instructions.
 
 ## Notes and limitations

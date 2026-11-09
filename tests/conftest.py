@@ -12,3 +12,17 @@ def safe_defaults(monkeypatch):
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "dashboard_password", "")
     monkeypatch.setattr(settings, "resend_api_key", "")
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_real_telegram(monkeypatch):
+    """Tests must never send real Telegram messages."""
+    import app.core.telegram_notifier as tn
+
+    def _blocked(url, payload, timeout=15):
+        raise RuntimeError("real Telegram call blocked in tests")
+
+    monkeypatch.setattr(tn, "_default_post", _blocked)
