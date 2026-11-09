@@ -1,4 +1,5 @@
 import socket
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
@@ -8,8 +9,15 @@ from bs4 import BeautifulSoup
 
 socket.setdefaulttimeout(10)
 
+# Kuch sites (jaise Al Jazeera) feedparser ke default User-Agent ko block karti hain
+feedparser.USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+)
+RETRY_DELAY = 1.5
+
 FEEDS = {
-    "BBC World": "http://feeds.bbci.co.uk/news/world/rss.xml",
+    "BBC World": "https://feeds.bbci.co.uk/news/world/rss.xml",
     "Dawn": "https://www.dawn.com/feeds/home",
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
     "TechCrunch": "https://techcrunch.com/feed/",
@@ -42,13 +50,19 @@ def parse_date(entry) -> Optional[datetime]:
 
 def fetch_feed(source: str, url: str, limit: int = 10) -> list[Article]:
     """Ek feed se articles laata hai. Fail ho to khali list return karta hai."""
-    try:
-        feed = feedparser.parse(url)
-    except Exception as e:
-        print(f"[ERROR] {source}: {e}")
-        return []
+    feed = None
+    for attempt in range(2):  # ek baar retry: temporary network hiccup se bachne ke liye
+        try:
+            feed = feedparser.parse(url)
+        except Exception as e:
+            print(f"[ERROR] {source}: {e}")
+            feed = None
+        if feed is not None and feed.entries:
+            break
+        if attempt == 0:
+            time.sleep(RETRY_DELAY)
 
-    if not feed.entries:
+    if feed is None or not feed.entries:
         print(f"[WARN] {source}: koi article nahi mila")
         return []
 
