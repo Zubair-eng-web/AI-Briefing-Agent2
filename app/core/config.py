@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///briefing.db"
 
     # Security (khali = band, local development ke liye)
+    # Personalization: comma-separated keywords, e.g. cricket, ai, pakistan
+    interests: str = ""
+
     api_key: str = ""
     dashboard_password: str = ""
 
