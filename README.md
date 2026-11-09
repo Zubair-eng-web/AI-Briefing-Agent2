@@ -1,8 +1,8 @@
 # AI Briefing Agent
 
-> An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts and a weekly intelligence report by email. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
+> An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end on a local machine, covered by 269 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by 269 automated tests that run offline. Remaining work: multi-user accounts, deeper fact-checking and demo screenshots (see the roadmap below).
 
 ## Project summary
 
@@ -11,20 +11,23 @@ Keeping up with news means opening many sites, feeds and videos every day. This 
 1. **Collects** articles from RSS feeds and new videos (with transcripts) from YouTube channels.
 2. **Merges** the same story reported by several outlets and **summarizes** it with Gemini.
 3. **Analyzes** every story: priority (Critical / High / Medium / Low), sentiment, and how many independent sources confirm it.
-4. **Delivers** a ranked daily email, an immediate alert for Critical stories and a weekly report with trending topics.
+4. **Delivers** a ranked daily email, an immediate alert for Critical stories (email and Telegram) and a weekly report with trending topics.
 5. **Answers questions** about the collected news (also in Roman Urdu / Hinglish) with citations, and refuses to answer when the news does not contain the answer.
 
 ## Features
 
-- **Collection:** RSS news feeds (BBC, Dawn, TechCrunch, The Guardian) and YouTube channels (RSS plus transcripts); one failing source never stops the rest
-- **Deduplication:** the same story from several outlets is merged (TF-IDF and cosine similarity)
-- **AI summaries:** 2-3 sentence story summaries; YouTube videos get a summary, key points and a takeaway; videos without a transcript are summarized from title and description and labelled as such
+- **Collection:** RSS feeds (BBC, Dawn, TechCrunch, The Guardian) and YouTube channels (RSS plus transcripts); one failing source never stops the rest
+- **Deduplication:** the same story from several outlets is merged by TF-IDF similarity and shared title keywords
+- **AI summaries:** 2-3 sentence story summaries; YouTube videos get a summary, key points and a takeaway
 - **Analysis:** priority and sentiment for all stories in a single LLM call, with safe defaults if the model answers badly
-- **Source credibility:** "Confirmed by N sources" (independent outlets) versus "Single source"
-- **Breaking alerts:** an immediate email for Critical stories, never sent twice for the same story
-- **Daily digest and weekly report:** ranked stories, YouTube highlights, trending topics (new / rising / falling) and a week-over-week comparison with an AI overview
-- **Research chat (RAG):** semantic search with Gemini embeddings (cached in the database, TF-IDF fallback), answers with citations
-- **API and dashboard:** FastAPI endpoints and a Streamlit dashboard (Stories, Videos, Stats, Chat)
+- **Source credibility:** "Confirmed by N sources" versus "Single source"
+- **Claim check:** one LLM call compares how outlets report the same story; stories where key details differ are labelled "Details differ"
+- **Breaking alerts:** an immediate email and Telegram message for Critical stories, never sent twice for the same story; a Telegram failure never blocks the pipeline
+- **Personalization:** your interests (dashboard sidebar, `PUT /interests`, or the `INTERESTS` setting) move matching stories up one priority tier, never above High or Critical
+- **Daily digest and weekly report:** ranked stories, YouTube highlights, trending topics and a week-over-week comparison
+- **Research chat (RAG):** semantic search with Gemini embeddings (cached, TF-IDF fallback), answers with citations
+- **Research agent:** a topic is split into sub-questions, each is searched in the collected news, and one grounded report is written with citations and a "Not covered" section
+- **API and dashboard:** FastAPI endpoints and a Streamlit dashboard (Stories, Videos, Stats, Chat, Research)
 
 ## Architecture
 
@@ -34,22 +37,22 @@ flowchart LR
     B[YouTube channels] --> V[Transcript + video summary]
     C --> D[Dedup + Summarize]
     D --> E[Analyze: priority + sentiment]
-    E --> F[Fact-check: source credibility]
-    F --> G[Rank]
-    G -->|Critical story| H[Breaking alert email]
+    E --> F[Fact-check: credibility + claim check]
+    F --> G[Rank + personalize]
+    G -->|Critical story| H[Breaking alert: email + Telegram]
     G --> I[Daily digest email]
     V --> I
     G --> J[(Database)]
     V --> J
     J --> K[FastAPI]
-    K --> L[Streamlit dashboard + research chat]
+    K --> L[Streamlit dashboard, research chat, research agent]
 ```
 
-The daily pipeline is orchestrated with **LangGraph**: conditional edges skip all work (and all API calls) when nothing is new, and add the alert step only when a Critical story exists. A second, lightweight graph runs every 30 minutes for breaking alerts and makes a single LLM call.
+The daily pipeline is orchestrated with **LangGraph**: conditional edges skip all work (and all API calls) when nothing is new, and add the alert step only when a Critical story exists. A second, lightweight graph checks for breaking alerts and makes a single LLM call.
 
 ## Tech stack
 
-Python 3.11, FastAPI, LangGraph, Google Gemini (summaries, analysis, embeddings), scikit-learn, SQLAlchemy (SQLite by default, PostgreSQL supported), APScheduler, Streamlit, feedparser, youtube-transcript-api, pytest, Docker Compose.
+Python 3.11, FastAPI, LangGraph, Google Gemini (summaries, analysis, embeddings), scikit-learn, SQLAlchemy (SQLite by default, PostgreSQL supported), APScheduler, Streamlit, feedparser, youtube-transcript-api, pytest, Docker Compose, GitHub Actions, Render.
 
 ## Quick start
 
@@ -64,84 +67,90 @@ copy .env.example .env           # then fill in your Gemini key and Gmail App Pa
 python -m app.scheduler --digest-now --all   # build and email a digest now
 uvicorn app.main:app --reload                # API on http://127.0.0.1:8000/docs
 streamlit run dashboard/app.py               # dashboard on http://localhost:8501
-python -m app.scheduler                      # daily digest, 30-minute alerts, weekly report
+python -m app.scheduler                      # daily digest, alerts, weekly report
 python -m pytest tests -q                    # run the test suite
 ```
 
-A Docker Compose setup (PostgreSQL, API, scheduler, dashboard) is included: `docker-compose up --build -d`.
+A Docker Compose setup (PostgreSQL, API, scheduler, dashboard) is included: `docker compose up --build -d`.
+
+## Configuration
+
+Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `DATABASE_URL`, `API_KEY`, `DASHBOARD_PASSWORD`, `INTERESTS` (comma-separated keywords, optional), `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` (optional).
+
+### Telegram setup
+
+1. Message `@BotFather` on Telegram, send `/newbot` and copy the token.
+2. Send `/start` to your new bot.
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` and read `chat.id`.
+4. Put both values in `.env` (and in the Render service environment). Never commit them.
 
 ## API
 
-`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly` and `POST /chat`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`. Interactive docs are served at `/docs`.
+`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`. Interactive docs are served at `/docs`.
+
+## Deployment
+
+The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.yml`) wakes the service and calls `/run-digest`, `/run-alerts` and `/run-weekly` on a schedule. Secrets (`API_URL`, `API_KEY`) live in the repository's Actions secrets.
 
 ## Project structure
 
-## Development progress
+```
+app/
+  main.py, pipeline.py, scheduler.py, video_pipeline.py, weekly.py
+  agents/      summarizer, analyzer, factchecker, claim_checker, ranker,
+               alert_agent, email_agent, research, deep_research,
+               video_agent, weekly_email
+  api/         routes, security
+  collectors/  rss, youtube
+  core/        config, database, models, storage, dedup, embeddings,
+               search_store, interests, mailer, telegram_notifier, story, video
+  graph/       briefing (daily pipeline), alerts (breaking alerts)
+dashboard/     Streamlit app, API client, helpers
+tests/         automated tests (all external services are faked)
+.github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
+render.yaml, docker-compose.yml, Dockerfile
+```
 
-The project was built step by step, and each step was tested before moving on.
+## Development progress
 
 ### Completed
 
 | # | Step | What was built |
 |---|------|----------------|
-| 1 | Environment | Python 3.11, virtual environment, Git |
-| 2 | Project structure | Package layout (agents, collectors, core, api, graph), tests folder |
-| 3 | Configuration | pydantic-settings, secrets only in `.env` |
-| 4 | RSS collector | Multiple feeds, HTML cleaning, failure-tolerant |
-| 5 | Database and dedup | SQLAlchemy models, SQLite, TF-IDF and cosine similarity to merge duplicate stories |
-| 6 | LLM summarization | Gemini summaries with a fallback to the original text |
-| 7 | Pipeline | Collect, save, dedup, summarize; only new articles are processed |
-| 8 | Email digest | HTML and plain-text email through Gmail SMTP |
-| 9 | Scheduler | APScheduler daily job |
-| 10 | Priority and sentiment | One LLM call classifies all stories; ranking by priority |
-| 11 | Source credibility | Independent-outlet counting ("Confirmed by N sources") |
-| 12 | LangGraph orchestrator | Shared state, nodes, conditional edges |
-| 13 | Breaking alerts | Alert branch for Critical stories, no repeat alerts |
-| 14 | Scheduler and graphs | Daily digest plus 30-minute alert check; state tracking so nothing is sent twice |
-| 15 | REST API | FastAPI endpoints with background jobs |
-| 16 | Research chat (RAG) | Retrieval, grounded answers with citations, Roman Urdu query rewriting, "not found" handling |
-| 16b | Embeddings | Gemini embeddings cached in the database, relevance threshold, TF-IDF fallback |
-| 17 | Dashboard | Streamlit app talking to the API |
-| 18 | YouTube intelligence | Channel RSS, transcripts, summary, key points, takeaway, Shorts filter |
-| 19 | Videos in email and dashboard | YouTube Highlights section, Videos tab |
-| 20 | Weekly report | Trending topics, week-over-week comparison, AI overview, Sunday email |
-| 21a | Docker and PostgreSQL support | Dockerfile, Compose file, database URL handling (the Compose stack is not yet verified end to end on the development machine) |
-| 21b-0 | GitHub | Repository, README, `.env.example`, secret scan before pushing |
+| 1-21 | Core system | Environment, structure, config, RSS, database and dedup, Gemini summaries, pipeline, email digest, scheduler, priority and sentiment, source credibility, LangGraph orchestration, breaking alerts, REST API, research chat (RAG) with embeddings, dashboard, YouTube intelligence, weekly report, Docker and PostgreSQL support, GitHub |
 | 22 | CI | GitHub Actions workflow running the test suite on every push |
 | 23 | Telegram notifier | Standalone notifier module with offline tests |
-| 24 | Telegram alerts | Critical stories are also sent to Telegram after the email; Telegram failures never block the pipeline, and tests can never send real messages |
-| 25 | Personalization | Single-user interests (INTERESTS setting): matching stories move up one tier in the ranking, never above High or Critical |
-| 25b | Interests API | Interests are stored in the database (GET/PUT /interests) and override the INTERESTS setting; the dashboard form follows |
-| 25c | Dashboard interests form | Sidebar form to edit interests; saved through the API, no .env edit needed |
-| 26 | Claim-level fact-checking | One LLM call compares how outlets report the same story; stories where key details differ get a "Details differ" label |
-| 27 | Research agent | Topic is split into sub-questions, each searched in the collected news, then one grounded report with citations and a "Not covered" section (POST /research, dashboard Research tab) |
-| 27b | Cross-outlet dedup | Stories from different outlets are also merged by shared title keywords (so "Confirmed by N sources" works); analyzer prompt made stricter about Critical |
+| 24 | Telegram alerts | Critical stories also go to Telegram after the email; failures never block the pipeline |
+| 25 | Personalization | Interests setting moves matching stories up one tier, never above High or Critical |
+| 25b | Interests API | Interests stored in the database (GET/PUT /interests) |
+| 25c | Dashboard form | Sidebar form to edit interests |
+| 26 | Claim check | One LLM call flags stories where outlets disagree on key details |
+| 27 | Research agent | Multi-step report with citations (POST /research, Research tab) |
+| 27b | Cross-outlet dedup | Same story from different outlets merged by title keywords; stricter Critical prompt |
 
 ### Remaining roadmap
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| 1 | Cloud deployment (Render) | Free web services sleep when idle, so an always-on scheduler needs a paid instance; YouTube often blocks transcript requests from cloud IPs |
-| 2 | Verify the Docker Compose stack | Run the full stack with PostgreSQL locally |
-| 3 | Personalization (multi-user) | Single-user keyword ranking is done (step 25); per-user accounts and feeds remain |
-| 4 | Social media sources | X, Facebook and Instagram APIs are paid or restricted; start with sources that have open official APIs |
-| 5 | Claim-level fact-checking (deeper) | Basic version is done (step 26); per-claim extraction and verification against outside sources remain |
-| 6 | Research agent (deeper) | Basic version is done (step 27); outside web sources and follow-up searches remain |
-| 7 | More notification channels | Telegram is done; others (for example Slack) could follow |
-| 8 | Demo | Screenshots in the README (CI is done) |
+| 1 | Verify the Docker Compose stack | Compose file is ready; a full local run with PostgreSQL is still to be verified |
+| 2 | Offline RSS test | The RSS collector test still uses the live internet |
+| 3 | Multi-user accounts | Per-user interests, ranking and feed |
+| 4 | Deeper fact-checking | Per-claim extraction and verification against outside sources |
+| 5 | Deeper research | Outside web sources and follow-up searches |
+| 6 | Demo | Screenshots in the README |
 
 ## Design decisions
 
-- **One LLM call for analysis:** all stories are classified together, which keeps free-tier quota usage low; a malformed answer falls back to safe defaults instead of breaking the pipeline.
-- **Idempotent by design:** database tables remember which articles were digested and which stories were alerted, so reruns never repeat an email.
-- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 269 tests run offline with fakes.
-- **Honest answers:** the research chat refuses when retrieval finds nothing relevant, and the prompt treats retrieved text as data, never as instructions.
+- **One LLM call for analysis:** all stories are classified together, which keeps free-tier quota usage low; a malformed answer falls back to safe defaults.
+- **Idempotent by design:** the database remembers which articles were digested and which stories were alerted, so reruns never repeat an email.
+- **Testable agents:** every external dependency (LLM, SMTP, Telegram, feeds, YouTube) is injected, so tests run offline with fakes.
+- **Honest answers:** the research chat refuses when retrieval finds nothing relevant, and prompts treat retrieved text as data, never as instructions.
 
 ## Notes and limitations
 
 - Facebook, Instagram and X are not included because their APIs are restricted or paid.
 - YouTube transcripts use the unofficial `youtube-transcript-api` library. It works locally, but YouTube often blocks cloud IP addresses.
-- Emails are sent through Gmail SMTP with an App Password.
-- Source credibility is rule-based (independent outlets that reported the story), not a claim-by-claim fact check.
-- Priority and sentiment are AI judgments and can occasionally be wrong.
 - Al Jazeera was replaced by The Guardian because its feed refused connections from the development network.
+- Emails are sent through Gmail SMTP with an App Password.
+- Source credibility and the claim check are LLM and rule based, not a full fact check.
+- Priority and sentiment are AI judgments and can occasionally be wrong.
