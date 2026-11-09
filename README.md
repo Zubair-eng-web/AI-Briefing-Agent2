@@ -144,3 +144,4 @@ The project was built step by step, and each step was tested before moving on.
 - Emails are sent through Gmail SMTP with an App Password.
 - Source credibility is rule-based (independent outlets that reported the story), not a claim-by-claim fact check.
 - Priority and sentiment are AI judgments and can occasionally be wrong.
+- Al Jazeera was replaced by The Guardian because its feed refused connections from the development network.
