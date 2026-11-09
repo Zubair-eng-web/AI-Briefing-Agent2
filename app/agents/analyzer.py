@@ -10,8 +10,11 @@ from app.core.story import PRIORITIES, SENTIMENTS, Story
 SYSTEM_PROMPT = (
     "You are a news editor. You receive a numbered list of news stories. "
     "For EACH story decide:\n"
-    "- priority: Critical (major breaking events, war, disasters, big security "
-    "or national emergencies), High (important politics, economy, policy), "
+    "- priority: Critical ONLY for events happening right now that threaten many lives "
+    "or national security (active war or major attack, large disaster, mass-casualty "
+    "accident, national emergency). Court verdicts, sentencing, election results and "
+    "ongoing investigations are NOT Critical. At most 1 in 5 stories may be Critical. "
+    "High (important politics, economy, policy, major crime), "
     "Medium (general news, technology), Low (sports, entertainment, lifestyle).\n"
     "- sentiment: positive, negative or neutral (the tone of the news itself).\n"
     'Reply ONLY with a JSON array like: '

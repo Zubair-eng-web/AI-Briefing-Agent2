@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts and a weekly intelligence report by email. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end on a local machine, covered by 263 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
+**Status:** working end to end on a local machine, covered by 269 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
 
 ## Project summary
 
@@ -115,6 +115,7 @@ The project was built step by step, and each step was tested before moving on.
 | 25c | Dashboard interests form | Sidebar form to edit interests; saved through the API, no .env edit needed |
 | 26 | Claim-level fact-checking | One LLM call compares how outlets report the same story; stories where key details differ get a "Details differ" label |
 | 27 | Research agent | Topic is split into sub-questions, each searched in the collected news, then one grounded report with citations and a "Not covered" section (POST /research, dashboard Research tab) |
+| 27b | Cross-outlet dedup | Stories from different outlets are also merged by shared title keywords (so "Confirmed by N sources" works); analyzer prompt made stricter about Critical |
 
 ### Remaining roadmap
 
@@ -133,7 +134,7 @@ The project was built step by step, and each step was tested before moving on.
 
 - **One LLM call for analysis:** all stories are classified together, which keeps free-tier quota usage low; a malformed answer falls back to safe defaults instead of breaking the pipeline.
 - **Idempotent by design:** database tables remember which articles were digested and which stories were alerted, so reruns never repeat an email.
-- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 263 tests run offline with fakes.
+- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 269 tests run offline with fakes.
 - **Honest answers:** the research chat refuses when retrieval finds nothing relevant, and the prompt treats retrieved text as data, never as instructions.
 
 ## Notes and limitations
