@@ -88,3 +88,11 @@ def get_videos(limit: int = 10) -> dict:
 
 def run_videos() -> dict:
     return _request("POST", "/run-videos")
+
+
+def get_interests() -> dict:
+    return _request("GET", "/interests")
+
+
+def save_interests(interests: str) -> dict:
+    return _request("PUT", "/interests", json={"interests": interests})

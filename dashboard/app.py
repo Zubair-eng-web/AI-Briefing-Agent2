@@ -110,6 +110,24 @@ with st.sidebar:
     if st.button("Run videos now", help="Naye YouTube videos ki summary banata hai"):
         trigger("Videos", api_client.run_videos)
     st.divider()
+    st.subheader("Interests")
+    try:
+        current_interests = api_client.get_interests()["interests"]
+    except (api_client.ApiError, KeyError):
+        current_interests = []
+    interests_text = st.text_input(
+        "Keywords (comma se alag)",
+        value=", ".join(current_interests),
+        placeholder="cricket, ai, pakistan",
+        help="In keywords wali stories ranking me upar aati hain (agle digest se).",
+    )
+    if st.button("Save interests"):
+        try:
+            saved = api_client.save_interests(interests_text)["interests"]
+            st.success(f"Save ho gaya: {', '.join(saved) if saved else 'koi interest nahi'}")
+        except api_client.ApiError as e:
+            st.warning(str(e))
+    st.divider()
     if st.button("Clear chat"):
         st.session_state.messages = []
 
