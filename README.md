@@ -107,6 +107,8 @@ The project was built step by step, and each step was tested before moving on.
 | 20 | Weekly report | Trending topics, week-over-week comparison, AI overview, Sunday email |
 | 21a | Docker and PostgreSQL support | Dockerfile, Compose file, database URL handling (the Compose stack is not yet verified end to end on the development machine) |
 | 21b-0 | GitHub | Repository, README, `.env.example`, secret scan before pushing |
+| 22 | CI | GitHub Actions workflow running the test suite on every push |
+| 23 | Telegram notifier | Standalone notifier module with offline tests (not yet wired into the alert pipeline) |
 
 ### Remaining roadmap
 
