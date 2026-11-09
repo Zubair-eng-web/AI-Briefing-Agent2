@@ -8,6 +8,7 @@ from app.core.storage import (
     get_recent_videos,
     get_stats,
 )
+from app.core.interests import get_interests, save_interests
 from app.core.story import PRIORITIES
 from app.scheduler import is_busy, run_alerts, run_digest, run_videos, run_weekly, safe_run
 from app.weekly import build_weekly_report
@@ -103,3 +104,19 @@ def weekly(overview: bool = False):
 def trigger_weekly(background_tasks: BackgroundTasks):
     """Weekly report banakar email karta hai (background me)."""
     return _start(run_weekly, "Weekly report", background_tasks)
+
+
+class InterestsRequest(BaseModel):
+    interests: str = Field(default="", max_length=1000)
+
+
+@router.get("/interests")
+def read_interests():
+    """Personalization keywords jo ranking me use hoti hain."""
+    return {"interests": get_interests()}
+
+
+@router.put("/interests")
+def update_interests(req: InterestsRequest):
+    """Keywords save karta hai (comma se alag). Khali bhejne par personalization band."""
+    return {"interests": save_interests(req.interests)}

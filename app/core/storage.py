@@ -5,7 +5,7 @@ from sqlalchemy import func
 
 from app.collectors.rss import Article
 from app.core.database import SessionLocal, init_db
-from app.core.models import AlertDB, ArticleDB, DigestedDB, StoryDB, VideoDB
+from app.core.models import AlertDB, ArticleDB, DigestedDB, SettingDB, StoryDB, VideoDB
 from app.core.story import PRIORITIES, Story
 from app.core.video import VideoSummary
 
@@ -309,3 +309,23 @@ def get_videos_between(start: datetime, end: datetime) -> list[dict]:
             .all()
         )
         return [_video_to_dict(r) for r in rows]
+
+
+def get_setting(key: str) -> str | None:
+    """Saved setting ki value, ya None agar kabhi save nahi hui."""
+    init_db()
+    with SessionLocal() as session:
+        row = session.get(SettingDB, key)
+        return row.value if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    init_db()
+    with SessionLocal() as session:
+        row = session.get(SettingDB, key)
+        if row:
+            row.value = value
+            row.updated_at = datetime.utcnow()
+        else:
+            session.add(SettingDB(key=key, value=value))
+        session.commit()

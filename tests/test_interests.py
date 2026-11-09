@@ -61,6 +61,7 @@ def test_critical_never_displaced():
 
 
 def test_default_reads_settings(monkeypatch):
+    monkeypatch.setattr("app.core.interests.load_stored_interests", lambda: None)
     monkeypatch.setattr(settings, "interests", "cricket")
     stories = [mk("Weather update", "Medium", sources=3), mk("Cricket final", "Medium")]
     assert titles(rank_stories(stories))[0] == "Cricket final"

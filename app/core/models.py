@@ -83,3 +83,13 @@ class VideoDB(Base):
     takeaway: Mapped[str] = mapped_column(Text, default="")
     has_transcript: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SettingDB(Base):
+    """Chhoti key/value settings jo dashboard se badalti hain (jaise interests)."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

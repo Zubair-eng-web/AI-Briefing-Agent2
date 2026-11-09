@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts and a weekly intelligence report by email. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end on a local machine, covered by 239 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
+**Status:** working end to end on a local machine, covered by 245 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
 
 ## Project summary
 
@@ -111,6 +111,7 @@ The project was built step by step, and each step was tested before moving on.
 | 23 | Telegram notifier | Standalone notifier module with offline tests |
 | 24 | Telegram alerts | Critical stories are also sent to Telegram after the email; Telegram failures never block the pipeline, and tests can never send real messages |
 | 25 | Personalization | Single-user interests (INTERESTS setting): matching stories move up one tier in the ranking, never above High or Critical |
+| 25b | Interests API | Interests are stored in the database (GET/PUT /interests) and override the INTERESTS setting; the dashboard form follows |
 
 ### Remaining roadmap
 
@@ -129,7 +130,7 @@ The project was built step by step, and each step was tested before moving on.
 
 - **One LLM call for analysis:** all stories are classified together, which keeps free-tier quota usage low; a malformed answer falls back to safe defaults instead of breaking the pipeline.
 - **Idempotent by design:** database tables remember which articles were digested and which stories were alerted, so reruns never repeat an email.
-- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 239 tests run offline with fakes.
+- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 245 tests run offline with fakes.
 - **Honest answers:** the research chat refuses when retrieval finds nothing relevant, and the prompt treats retrieved text as data, never as instructions.
 
 ## Notes and limitations
