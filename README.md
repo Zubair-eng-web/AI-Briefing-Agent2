@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts and a weekly intelligence report by email. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end on a local machine, covered by 254 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
+**Status:** working end to end on a local machine, covered by 263 automated tests. Cloud deployment, personalization and social-media sources are still to do (see the roadmap below).
 
 ## Project summary
 
@@ -114,6 +114,7 @@ The project was built step by step, and each step was tested before moving on.
 | 25b | Interests API | Interests are stored in the database (GET/PUT /interests) and override the INTERESTS setting; the dashboard form follows |
 | 25c | Dashboard interests form | Sidebar form to edit interests; saved through the API, no .env edit needed |
 | 26 | Claim-level fact-checking | One LLM call compares how outlets report the same story; stories where key details differ get a "Details differ" label |
+| 27 | Research agent | Topic is split into sub-questions, each searched in the collected news, then one grounded report with citations and a "Not covered" section (POST /research, dashboard Research tab) |
 
 ### Remaining roadmap
 
@@ -124,7 +125,7 @@ The project was built step by step, and each step was tested before moving on.
 | 3 | Personalization (multi-user) | Single-user keyword ranking is done (step 25); per-user accounts and feeds remain |
 | 4 | Social media sources | X, Facebook and Instagram APIs are paid or restricted; start with sources that have open official APIs |
 | 5 | Claim-level fact-checking (deeper) | Basic version is done (step 26); per-claim extraction and verification against outside sources remain |
-| 6 | Research agent | Multi-step deep dives on a topic |
+| 6 | Research agent (deeper) | Basic version is done (step 27); outside web sources and follow-up searches remain |
 | 7 | More notification channels | Telegram is done; others (for example Slack) could follow |
 | 8 | Demo | Screenshots in the README (CI is done) |
 
@@ -132,7 +133,7 @@ The project was built step by step, and each step was tested before moving on.
 
 - **One LLM call for analysis:** all stories are classified together, which keeps free-tier quota usage low; a malformed answer falls back to safe defaults instead of breaking the pipeline.
 - **Idempotent by design:** database tables remember which articles were digested and which stories were alerted, so reruns never repeat an email.
-- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 254 tests run offline with fakes.
+- **Testable agents:** every external dependency (LLM, SMTP, feeds, YouTube) is injected, so all 263 tests run offline with fakes.
 - **Honest answers:** the research chat refuses when retrieval finds nothing relevant, and the prompt treats retrieved text as data, never as instructions.
 
 ## Notes and limitations

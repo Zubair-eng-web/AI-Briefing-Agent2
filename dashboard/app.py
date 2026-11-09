@@ -133,7 +133,7 @@ with st.sidebar:
 
 priority = None if choice == "All" else choice
 
-stories_tab, videos_tab, stats_tab, chat_tab = st.tabs(["Stories", "Videos", "Stats", "Chat"])
+stories_tab, videos_tab, stats_tab, chat_tab, research_tab = st.tabs(["Stories", "Videos", "Stats", "Chat", "Research"])
 
 with stories_tab:
     stories = []
@@ -216,3 +216,30 @@ with chat_tab:
         st.session_state.messages.append(
             {"role": "assistant", "content": answer, "sources": sources}
         )
+
+
+with research_tab:
+    st.caption("Kisi topic par collected khabron se multi-step report (2 Gemini calls, 10-30 second).")
+    research_topic = st.text_input(
+        "Topic", placeholder="Egypt train collision / Pakistan ke naye provinces", key="research_topic"
+    )
+    if st.button("Research karein"):
+        if len(research_topic.strip()) < 3:
+            st.warning("Topic kam az kam 3 harf ka likhein.")
+        else:
+            try:
+                with st.spinner("Research ho rahi hai..."):
+                    st.session_state.research_result = api_client.research(research_topic.strip())
+            except api_client.ApiError as e:
+                st.warning(f"Research nahi ho saki: {e}")
+
+    research_result = st.session_state.get("research_result")
+    if research_result:
+        st.caption(
+            "Sub-questions: "
+            + " | ".join(
+                f"{c['question']} ({c['hits']})" for c in research_result.get("coverage", [])
+            )
+        )
+        st.markdown(utils.md_safe(research_result["report"]))
+        render_sources(research_result.get("sources"))

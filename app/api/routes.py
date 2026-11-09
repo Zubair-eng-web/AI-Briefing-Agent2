@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.agents.deep_research import run_research
 from app.agents.research import ResearchError, answer_question
 from app.core.storage import (
     get_recent_articles,
@@ -120,3 +121,21 @@ def read_interests():
 def update_interests(req: InterestsRequest):
     """Keywords save karta hai (comma se alag). Khali bhejne par personalization band."""
     return {"interests": save_interests(req.interests)}
+
+
+class ResearchRequest(BaseModel):
+    topic: str = Field(min_length=3, max_length=300)
+
+
+@router.post("/research")
+def research(req: ResearchRequest):
+    """Topic par multi-step report (collected khabron se, sources ke saath)."""
+    topic = req.topic.strip()
+    if len(topic) < 3:
+        raise HTTPException(status_code=400, detail="Topic bohat chhota hai")
+    try:
+        return run_research(topic)
+    except ValueError as e:  # GEMINI_API_KEY set nahi
+        raise HTTPException(status_code=503, detail=str(e))
+    except ResearchError as e:
+        raise HTTPException(status_code=502, detail=str(e))

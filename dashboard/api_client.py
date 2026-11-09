@@ -96,3 +96,8 @@ def get_interests() -> dict:
 
 def save_interests(interests: str) -> dict:
     return _request("PUT", "/interests", json={"interests": interests})
+
+
+def research(topic: str) -> dict:
+    # 2 Gemini calls + embeddings, is liye lamba timeout
+    return _request("POST", "/research", timeout=120, json={"topic": topic})
