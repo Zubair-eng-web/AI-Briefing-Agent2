@@ -12,3 +12,5 @@ class Story:
     priority: str = "Medium"
     sentiment: str = "neutral"
     credibility: str = "Single source"
+    evidence: list[tuple[str, str]] = field(default_factory=list)  # (source, title + snippet), DB me save nahi hota
+    claim_notes: str = ""

@@ -1,6 +1,7 @@
 import time
 
 from app.agents.analyzer import analyze_stories
+from app.agents.claim_checker import check_claims
 from app.agents.factchecker import check_credibility
 from app.agents.ranker import rank_stories
 from app.agents.summarizer import get_client, summarize_article
@@ -33,6 +34,7 @@ def build_stories(
                 title=main.title,
                 summary=summary,
                 sources=[(a.source, a.link) for a in group],
+                evidence=[(a.source, f"{a.title}. {a.summary[:400]}") for a in group],
             )
         )
         if delay:
@@ -63,6 +65,7 @@ def run_pipeline(
     )
     analyze_stories(stories, client)
     check_credibility(stories)
+    check_claims(stories, client)
     return rank_stories(stories)[:max_stories]
 
 

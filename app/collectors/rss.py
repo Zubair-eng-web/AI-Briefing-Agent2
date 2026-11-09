@@ -19,7 +19,7 @@ RETRY_DELAY = 1.5
 FEEDS = {
     "BBC World": "https://feeds.bbci.co.uk/news/world/rss.xml",
     "Dawn": "https://www.dawn.com/feeds/home",
-    "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
+    "The Guardian": "https://www.theguardian.com/world/rss",
     "TechCrunch": "https://techcrunch.com/feed/",
 }
 
