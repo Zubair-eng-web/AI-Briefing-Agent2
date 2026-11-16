@@ -79,3 +79,18 @@ def my_feed(limit: int = Query(20, ge=1, le=100), user: dict = Depends(get_curre
     """Recent stories re-ranked for this user's interests."""
     ranked = personalize_stories(get_recent_stories(limit=100), user["interests"])[:limit]
     return {"interests": user["interests"], "count": len(ranked), "stories": ranked}
+
+
+class Delivery(BaseModel):
+    digest_enabled: bool
+
+
+@router.get("/me/delivery")
+def my_delivery(user: dict = Depends(get_current_user)):
+    return {"email": user["email"], "digest_enabled": users.get_digest_enabled(user["id"])}
+
+
+@router.put("/me/delivery")
+def update_my_delivery(req: Delivery, user: dict = Depends(get_current_user)):
+    users.set_digest_enabled(user["id"], req.digest_enabled)
+    return {"email": user["email"], "digest_enabled": users.get_digest_enabled(user["id"])}

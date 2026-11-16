@@ -105,3 +105,13 @@ class UserDB(Base):
     password_hash: Mapped[str] = mapped_column(String(300))
     interests: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class UserPrefDB(Base):
+    """Per-user delivery settings (abhi: daily digest email on/off)."""
+
+    __tablename__ = "user_prefs"
+
+    user_id: Mapped[int] = mapped_column(primary_key=True)
+    digest_enabled: Mapped[bool] = mapped_column(default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

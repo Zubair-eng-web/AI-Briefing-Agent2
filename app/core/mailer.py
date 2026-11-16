@@ -34,9 +34,9 @@ def send_via_resend(msg: EmailMessage, http_post=None) -> None:
         raise RuntimeError(f"Resend error {response.status_code}: {response.text[:200]}")
 
 
-def deliver(build, smtp_class=None, http_post=None) -> None:
+def deliver(build, smtp_class=None, http_post=None, receiver=None) -> None:
     """build(sender, receiver) -> EmailMessage. RESEND_API_KEY ho to HTTPS, warna Gmail SMTP."""
-    receiver = settings.email_receiver
+    receiver = receiver or settings.email_receiver
 
     if settings.resend_api_key and smtp_class is None:
         if not receiver:

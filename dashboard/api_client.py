@@ -126,3 +126,13 @@ def save_my_interests(token: str, interests: str) -> dict:
     return _request(
         "PUT", "/me/interests", json={"interests": interests}, extra_headers=_bearer(token)
     )
+
+
+def get_delivery(token: str) -> dict:
+    return _request("GET", "/me/delivery", extra_headers=_bearer(token))
+
+
+def save_delivery(token: str, digest_enabled: bool) -> dict:
+    return _request(
+        "PUT", "/me/delivery", json={"digest_enabled": digest_enabled}, extra_headers=_bearer(token)
+    )

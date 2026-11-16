@@ -132,6 +132,7 @@ render.yaml, docker-compose.yml, Dockerfile
 | 30 | Accounts core | Users table, salted PBKDF2 password hashing, signed login tokens, `/auth/register`, `/auth/login`, `/me`, `/me/interests` |
 | 31 | Personal feed | `GET /me/feed` re-ranks stored stories by the logged-in user's own interests |
 | 32 | Dashboard accounts | Login and register in the sidebar, plus a My feed tab with per-user interests |
+| 33 | Per-user digest | Opted-in users get a daily email ranked by their own interests, at most one per day; one failing user never blocks the others |
 
 ### Product roadmap
 
@@ -150,7 +151,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 |---|------|-----------|
 | 1.1 | User accounts and login | Register, login and token-based auth replace the single shared API key |
 | 1.2 | Per-user interests and ranking | Each user has their own interests, priority boosts and feed |
-| 1.3 | Per-user delivery settings | Each user sets email, Telegram chat and digest time |
+| 1.3 | Per-user delivery settings | Digest on/off is done; Telegram chat and digest time are still open |
 | 1.4 | User-managed sources | Users can add or remove their own RSS feeds and YouTube channels |
 
 **Phase 2: Intelligence quality (exit: measurable accuracy gains)**

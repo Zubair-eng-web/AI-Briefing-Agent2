@@ -6,6 +6,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from app.agents.user_digest import send_user_digests
 from app.core.config import settings
 from app.core.storage import (
     get_recent_videos,
@@ -75,6 +76,12 @@ def run_digest(runner=run_briefing, include_all: bool = False, video_job=None) -
             **options,
         )
     print_trace("Digest", result)
+    if not include_all and result.get("sent") and settings.auth_secret:
+        try:
+            summary = send_user_digests()
+            print(f"  user digests: {summary}")
+        except Exception as e:  # user emails fail hon to bhi main digest ka natija nahi badalta
+            print(f"[WARN] User digests fail hui: {type(e).__name__}: {e}")
     return result
 
 

@@ -66,6 +66,19 @@ def render_feed(limit: int) -> None:
         except api_client.ApiError as e:
             st.warning(str(e))
 
+    try:
+        delivery = api_client.get_delivery(token)
+        wanted = st.checkbox(
+            f"Daily digest meri email par bhejein ({delivery['email']})",
+            value=delivery["digest_enabled"],
+            key="digest_enabled",
+        )
+        if wanted != delivery["digest_enabled"]:
+            api_client.save_delivery(token, wanted)
+            st.success("Delivery setting save ho gayi.")
+    except api_client.ApiError as e:
+        st.warning(str(e))
+
     if not feed["stories"]:
         st.info("Abhi koi story nahi. Pehle digest chalayein.")
         return

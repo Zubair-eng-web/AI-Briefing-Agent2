@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.database import SessionLocal
 from app.core.interests import MAX_INTERESTS, MAX_KEYWORD_LEN, parse_interests
-from app.core.models import UserDB
+from app.core.models import UserDB, UserPrefDB
 
 ITERATIONS = 240_000
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -112,3 +112,35 @@ def set_user_interests(user_id: int, raw: str, session_factory=None) -> list[str
         user.interests = ", ".join(cleaned)
         db.commit()
         return cleaned
+
+
+def set_digest_enabled(user_id: int, enabled: bool, session_factory=None) -> bool | None:
+    with _open(session_factory) as db:
+        if db.get(UserDB, user_id) is None:
+            return None
+        pref = db.get(UserPrefDB, user_id)
+        if pref is None:
+            pref = UserPrefDB(user_id=user_id)
+            db.add(pref)
+        pref.digest_enabled = bool(enabled)
+        db.commit()
+        return bool(enabled)
+
+
+def get_digest_enabled(user_id: int, session_factory=None) -> bool:
+    with _open(session_factory) as db:
+        pref = db.get(UserPrefDB, user_id)
+        return bool(pref and pref.digest_enabled)
+
+
+def list_digest_recipients(session_factory=None) -> list[dict]:
+    """Wo users jinhon ne daily digest on ki hai."""
+    with _open(session_factory) as db:
+        rows = (
+            db.query(UserDB)
+            .join(UserPrefDB, UserPrefDB.user_id == UserDB.id)
+            .filter(UserPrefDB.digest_enabled.is_(True))
+            .order_by(UserDB.id)
+            .all()
+        )
+        return [_to_dict(u) for u in rows]
