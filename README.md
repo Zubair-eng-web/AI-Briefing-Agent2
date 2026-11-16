@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by automated tests that all run offline (84% coverage), with lint and a coverage gate in CI. Next: multi-user accounts, migrations and production hardening; Docker verification is planned last (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by 311 automated tests that all run offline (85% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Next: production hardening (rate limiting, logging), then Docker verification (see the roadmap below).
 
 ## Project summary
 
@@ -27,7 +27,10 @@ Keeping up with news means opening many sites, feeds and videos every day. This 
 - **Daily digest and weekly report:** ranked stories, YouTube highlights, trending topics and a week-over-week comparison
 - **Research chat (RAG):** semantic search with Gemini embeddings (cached, TF-IDF fallback), answers with citations
 - **Research agent:** a topic is split into sub-questions, each is searched in the collected news, and one grounded report is written with citations and a "Not covered" section
-- **API and dashboard:** FastAPI endpoints and a Streamlit dashboard (Stories, Videos, Stats, Chat, Research)
+- **Accounts:** register and login with signed tokens, salted PBKDF2 password hashes and per-user interests
+- **Personal feed:** `GET /me/feed` re-ranks stored stories by the logged-in user's own interests
+- **Per-user digest:** opted-in users get their own daily email, ranked by their interests, at most one per day
+- **API and dashboard:** FastAPI endpoints and a Streamlit dashboard (Stories, Videos, Stats, Chat, Research, My feed)
 
 ## Architecture
 
@@ -52,7 +55,7 @@ The daily pipeline is orchestrated with **LangGraph**: conditional edges skip al
 
 ## Tech stack
 
-Python 3.11, FastAPI, LangGraph, Google Gemini (summaries, analysis, embeddings), scikit-learn, SQLAlchemy (SQLite by default, PostgreSQL supported), APScheduler, Streamlit, feedparser, youtube-transcript-api, pytest, Docker Compose, GitHub Actions, Render.
+Python 3.11, FastAPI, LangGraph, Google Gemini (summaries, analysis, embeddings), scikit-learn, SQLAlchemy with Alembic migrations (SQLite by default, PostgreSQL supported), APScheduler, Streamlit, feedparser, youtube-transcript-api, pytest, Docker Compose, GitHub Actions, Render.
 
 ## Quick start
 
@@ -69,13 +72,14 @@ uvicorn app.main:app --reload                # API on http://127.0.0.1:8000/docs
 streamlit run dashboard/app.py               # dashboard on http://localhost:8501
 python -m app.scheduler                      # daily digest, alerts, weekly report
 python -m pytest tests -q                    # run the test suite
+python -m app.core.migrate                   # create or upgrade the database schema
 ```
 
 A Docker Compose setup (PostgreSQL, API, scheduler, dashboard) is included: `docker compose up --build -d`.
 
 ## Configuration
 
-Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `DATABASE_URL`, `API_KEY`, `DASHBOARD_PASSWORD`, `INTERESTS` (comma-separated keywords, optional), `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` (optional).
+Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `DATABASE_URL`, `API_KEY`, `DASHBOARD_PASSWORD`, `INTERESTS` (comma-separated keywords, optional), `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` (optional). Accounts need `AUTH_SECRET` (a long random string; leave it empty to switch accounts off) and optionally `AUTH_TOKEN_HOURS` (token lifetime, default 72).
 
 ### Telegram setup
 
@@ -86,7 +90,9 @@ Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, 
 
 ## API
 
-`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`. Interactive docs are served at `/docs`.
+`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
+
+Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (daily digest on/off).
 
 ## Deployment
 
@@ -99,14 +105,16 @@ app/
   main.py, pipeline.py, scheduler.py, video_pipeline.py, weekly.py
   agents/      summarizer, analyzer, factchecker, claim_checker, ranker,
                alert_agent, email_agent, research, deep_research,
-               video_agent, weekly_email
-  api/         routes, security
+               video_agent, weekly_email, user_digest
+  api/         routes, security, auth
   collectors/  rss, youtube
   core/        config, database, models, storage, dedup, embeddings,
-               search_store, interests, mailer, telegram_notifier, story, video
+               search_store, interests, mailer, telegram_notifier, story, video,
+               users, tokens, personalize, migrate
   graph/       briefing (daily pipeline), alerts (breaking alerts)
-dashboard/     Streamlit app, API client, helpers
+dashboard/     Streamlit app, accounts UI, API client, helpers
 tests/         automated tests (all external services are faked)
+migrations/    Alembic migration scripts (baseline 0001)
 .github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
 render.yaml, docker-compose.yml, Dockerfile
 ```
@@ -150,8 +158,8 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 1.1 | User accounts and login | Register, login and token-based auth replace the single shared API key |
-| 1.2 | Per-user interests and ranking | Each user has their own interests, priority boosts and feed |
+| 1.1 | User accounts and login (done) | Register, login and signed tokens work; the shared API key still protects the core endpoints |
+| 1.2 | Per-user interests and ranking (done) | Each user has their own interests, priority boosts and feed |
 | 1.3 | Per-user delivery settings | Digest on/off is done; Telegram chat and digest time are still open |
 | 1.4 | User-managed sources | Users can add or remove their own RSS feeds and YouTube channels |
 
@@ -187,12 +195,14 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 - **Idempotent by design:** the database remembers which articles were digested and which stories were alerted, so reruns never repeat an email.
 - **Testable agents:** every external dependency (LLM, SMTP, Telegram, feeds, YouTube) is injected, so tests run offline with fakes.
 - **Honest answers:** the research chat refuses when retrieval finds nothing relevant, and prompts treat retrieved text as data, never as instructions.
+- **Accounts are opt-in:** without `AUTH_SECRET` the account endpoints answer 503 and everything else works exactly as before.
+- **Safe credentials:** passwords are stored as salted PBKDF2 hashes, login tokens are HMAC-signed and expire, and unknown emails take the same time as wrong passwords.
 
 ## Notes and limitations
 
 - Facebook, Instagram and X are not included because their APIs are restricted or paid.
 - YouTube transcripts use the unofficial `youtube-transcript-api` library. It works locally, but YouTube often blocks cloud IP addresses.
 - Al Jazeera was replaced by The Guardian because its feed refused connections from the development network.
-- Emails are sent through Gmail SMTP with an App Password.
+- Emails are sent through Gmail SMTP with an App Password. Per-user digests need a provider that can send to any address (Gmail SMTP works; Resend's test sender only reaches your own address).
 - Source credibility and the claim check are LLM and rule based, not a full fact check.
 - Priority and sentiment are AI judgments and can occasionally be wrong.
