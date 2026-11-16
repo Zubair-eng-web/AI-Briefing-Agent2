@@ -133,6 +133,7 @@ render.yaml, docker-compose.yml, Dockerfile
 | 31 | Personal feed | `GET /me/feed` re-ranks stored stories by the logged-in user's own interests |
 | 32 | Dashboard accounts | Login and register in the sidebar, plus a My feed tab with per-user interests |
 | 33 | Per-user digest | Opted-in users get a daily email ranked by their own interests, at most one per day; one failing user never blocks the others |
+| 34 | Migrations baseline | Alembic baseline (`0001`) and `python -m app.core.migrate`, which also adopts existing databases without touching their data |
 
 ### Product roadmap
 
@@ -143,7 +144,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | # | Item | Done when |
 |---|------|-----------|
 | 0.1 | Verify Docker Compose stack (planned last) | `docker compose up` brings up PostgreSQL, API, scheduler and dashboard; `/health` is OK |
-| 0.4 | Database migrations | Alembic replaces create-all; schema changes are versioned |
+| 0.4 | Database migrations | Baseline and upgrade command are done; app startup still uses create-all until the first schema change |
 
 **Phase 1: Multi-user foundation (exit: two users see different feeds)**
 
