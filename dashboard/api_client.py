@@ -26,9 +26,12 @@ def _detail(response: httpx.Response) -> str:
     return f"API error {response.status_code}"
 
 
-def _request(method: str, path: str, timeout: float = 20.0, **kwargs):
+def _request(
+    method: str, path: str, timeout: float = 20.0, extra_headers: dict | None = None, **kwargs
+):
     try:
         headers = {"X-API-Key": settings.api_key} if settings.api_key else {}
+        headers.update(extra_headers or {})
         with httpx.Client(
             base_url=base_url(), timeout=timeout, transport=_transport, headers=headers
         ) as client:
@@ -101,3 +104,25 @@ def save_interests(interests: str) -> dict:
 def research(topic: str) -> dict:
     # 2 Gemini calls + embeddings, is liye lamba timeout
     return _request("POST", "/research", timeout=120, json={"topic": topic})
+
+
+def _bearer(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def register(email: str, password: str) -> dict:
+    return _request("POST", "/auth/register", json={"email": email, "password": password})
+
+
+def login(email: str, password: str) -> dict:
+    return _request("POST", "/auth/login", json={"email": email, "password": password})
+
+
+def my_feed(token: str, limit: int = 20) -> dict:
+    return _request("GET", "/me/feed", params={"limit": limit}, extra_headers=_bearer(token))
+
+
+def save_my_interests(token: str, interests: str) -> dict:
+    return _request(
+        "PUT", "/me/interests", json={"interests": interests}, extra_headers=_bearer(token)
+    )

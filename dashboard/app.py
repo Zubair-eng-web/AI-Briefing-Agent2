@@ -6,10 +6,10 @@ import pandas as pd
 import streamlit as st
 
 try:
-    from dashboard import api_client, utils
+    from dashboard import account, api_client, utils
 except ModuleNotFoundError:  # "streamlit run dashboard/app.py" me project root path me nahi hota
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from dashboard import api_client, utils
+    from dashboard import account, api_client, utils
 
 import hmac
 
@@ -128,12 +128,16 @@ with st.sidebar:
         except api_client.ApiError as e:
             st.warning(str(e))
     st.divider()
+    account.render_sidebar()
+    st.divider()
     if st.button("Clear chat"):
         st.session_state.messages = []
 
 priority = None if choice == "All" else choice
 
-stories_tab, videos_tab, stats_tab, chat_tab, research_tab = st.tabs(["Stories", "Videos", "Stats", "Chat", "Research"])
+stories_tab, videos_tab, stats_tab, chat_tab, research_tab, my_feed_tab = st.tabs(
+    ["Stories", "Videos", "Stats", "Chat", "Research", "My feed"]
+)
 
 with stories_tab:
     stories = []
@@ -243,3 +247,6 @@ with research_tab:
         )
         st.markdown(utils.md_safe(research_result["report"]))
         render_sources(research_result.get("sources"))
+
+with my_feed_tab:
+    account.render_feed(limit)

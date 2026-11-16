@@ -1,0 +1,85 @@
+"""Dashboard account UI: login/register in the sidebar and a personalised feed tab."""
+import streamlit as st
+
+from dashboard import api_client, utils
+
+
+def _sign_in(action, email: str, password: str) -> None:
+    try:
+        result = action(email.strip(), password)
+    except api_client.ApiError as e:
+        st.warning(str(e))
+        return
+    st.session_state["token"] = result["access_token"]
+    st.session_state["user_email"] = result["user"]["email"]
+    st.rerun()
+
+
+def _sign_out() -> None:
+    for key in ("token", "user_email"):
+        st.session_state.pop(key, None)
+    st.rerun()
+
+
+def render_sidebar() -> None:
+    st.subheader("Account")
+    if st.session_state.get("token"):
+        st.caption(f"Logged in: {st.session_state.get('user_email', '')}")
+        if st.button("Logout"):
+            _sign_out()
+        return
+    email = st.text_input("Email", key="acc_email")
+    password = st.text_input("Password (kam az kam 8 harf)", type="password", key="acc_password")
+    left, right = st.columns(2)
+    if left.button("Login"):
+        _sign_in(api_client.login, email, password)
+    if right.button("Register"):
+        _sign_in(api_client.register, email, password)
+
+
+def render_feed(limit: int) -> None:
+    token = st.session_state.get("token")
+    if not token:
+        st.info("Apni personal feed ke liye sidebar se Login ya Register karein.")
+        return
+
+    try:
+        feed = api_client.my_feed(token, limit=limit)
+    except api_client.ApiError as e:
+        st.warning(f"Feed nahi mili: {e}")
+        if st.button("Logout karein", key="feed_logout"):
+            _sign_out()
+        return
+
+    st.caption("Ye feed sirf aapki interests ke hisab se rank hoti hai.")
+    text = st.text_input(
+        "Meri interests (comma se alag)",
+        value=", ".join(feed["interests"]),
+        placeholder="cricket, ai, pakistan",
+        key="my_interests",
+    )
+    if st.button("Save my interests"):
+        try:
+            api_client.save_my_interests(token, text)
+            st.success("Save ho gaya. Feed dobara load hogi.")
+            st.rerun()
+        except api_client.ApiError as e:
+            st.warning(str(e))
+
+    if not feed["stories"]:
+        st.info("Abhi koi story nahi. Pehle digest chalayein.")
+        return
+    for i, story in enumerate(feed["stories"], 1):
+        with st.container(border=True):
+            badges = [
+                utils.badge_html(story["priority"], utils.priority_color(story["priority"])),
+                utils.badge_html(story["credibility"], utils.NEUTRAL_COLOR),
+            ] + [utils.badge_html("match: " + k, "#6b46c1") for k in story["matched_interests"]]
+            st.markdown(" &nbsp; ".join(badges), unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="font-size:18px;font-weight:600;margin:6px 0;">'
+                f"{i}. {utils.html_safe(story['title'])}</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(utils.md_safe(story["summary"]))
+            st.caption("Sources: " + utils.sources_markdown(story.get("sources", [])))

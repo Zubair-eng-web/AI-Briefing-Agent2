@@ -1,9 +1,11 @@
 """Account endpoints: register, login, current user, per-user interests."""
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.core import users
 from app.core.config import settings
+from app.core.personalize import personalize_stories
+from app.core.storage import get_recent_stories
 from app.core.tokens import create_token, verify_token
 
 router = APIRouter(tags=["accounts"])
@@ -70,3 +72,10 @@ def me(user: dict = Depends(get_current_user)):
 def update_my_interests(req: UserInterests, user: dict = Depends(get_current_user)):
     saved = users.set_user_interests(user["id"], req.interests)
     return {"interests": saved or []}
+
+
+@router.get("/me/feed")
+def my_feed(limit: int = Query(20, ge=1, le=100), user: dict = Depends(get_current_user)):
+    """Recent stories re-ranked for this user's interests."""
+    ranked = personalize_stories(get_recent_stories(limit=100), user["interests"])[:limit]
+    return {"interests": user["interests"], "count": len(ranked), "stories": ranked}

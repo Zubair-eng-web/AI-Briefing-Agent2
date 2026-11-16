@@ -130,6 +130,8 @@ render.yaml, docker-compose.yml, Dockerfile
 | 28 | Offline RSS tests | RSS collector tests use fake feeds; the whole suite runs without internet |
 | 29 | Quality gate in CI | ruff lint and a minimum 80% coverage check run on every push |
 | 30 | Accounts core | Users table, salted PBKDF2 password hashing, signed login tokens, `/auth/register`, `/auth/login`, `/me`, `/me/interests` |
+| 31 | Personal feed | `GET /me/feed` re-ranks stored stories by the logged-in user's own interests |
+| 32 | Dashboard accounts | Login and register in the sidebar, plus a My feed tab with per-user interests |
 
 ### Product roadmap
 

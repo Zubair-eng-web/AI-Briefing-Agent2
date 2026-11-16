@@ -12,3 +12,6 @@ preview.html
 *.log
 .streamlit/secrets.toml
 .venv/
+
+.coverage
+htmlcov/
