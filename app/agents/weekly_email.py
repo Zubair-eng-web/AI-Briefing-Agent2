@@ -1,11 +1,8 @@
-import smtplib
-import ssl
 from datetime import datetime
 from email.message import EmailMessage
 from html import escape
 
 from app.agents.email_agent import PRIORITY_COLORS, SENTIMENT_COLORS, _safe_link, build_videos_html
-from app.core.config import settings
 from app.core.mailer import deliver
 from app.core.story import PRIORITIES, SENTIMENTS
 

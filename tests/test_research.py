@@ -1,11 +1,9 @@
 from types import SimpleNamespace
 
-import pytest
 
 from app.agents.research import (
     NO_INFO,
     Doc,
-    ResearchError,
     answer_question,
     load_documents,
     retrieve,

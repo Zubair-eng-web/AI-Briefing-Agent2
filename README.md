@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by automated tests that all run offline. Next: Docker verification, multi-user accounts and production hardening (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by automated tests that all run offline (84% coverage), with lint and a coverage gate in CI. Next: multi-user accounts, migrations and production hardening; Docker verification is planned last (see the roadmap below).
 
 ## Project summary
 
@@ -128,6 +128,8 @@ render.yaml, docker-compose.yml, Dockerfile
 | 27 | Research agent | Multi-step report with citations (POST /research, Research tab) |
 | 27b | Cross-outlet dedup | Same story from different outlets merged by title keywords; stricter Critical prompt |
 | 28 | Offline RSS tests | RSS collector tests use fake feeds; the whole suite runs without internet |
+| 29 | Quality gate in CI | ruff lint and a minimum 80% coverage check run on every push |
+| 30 | Accounts core | Users table, salted PBKDF2 password hashing, signed login tokens, `/auth/register`, `/auth/login`, `/me`, `/me/interests` |
 
 ### Product roadmap
 
@@ -137,9 +139,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 0.1 | Verify Docker Compose stack | `docker compose up` brings up PostgreSQL, API, scheduler and dashboard; `/health` is OK |
-| 0.2 | Lint and format in CI | ruff and a type check run in GitHub Actions |
-| 0.3 | Test coverage report | Coverage is measured in CI and a minimum threshold is enforced |
+| 0.1 | Verify Docker Compose stack (planned last) | `docker compose up` brings up PostgreSQL, API, scheduler and dashboard; `/health` is OK |
 | 0.4 | Database migrations | Alembic replaces create-all; schema changes are versioned |
 
 **Phase 1: Multi-user foundation (exit: two users see different feeds)**

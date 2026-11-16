@@ -1,6 +1,5 @@
 import pytest
 
-from app.agents import email_agent
 from app.agents.email_agent import build_html, build_message, send_email
 from app.core.config import settings
 from app.pipeline import Story

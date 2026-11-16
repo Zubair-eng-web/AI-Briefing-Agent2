@@ -1,5 +1,3 @@
-import smtplib
-import ssl
 from collections import Counter
 from datetime import datetime
 from email.message import EmailMessage

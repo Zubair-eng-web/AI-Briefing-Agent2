@@ -1,5 +1,3 @@
-import smtplib
-import ssl
 from email.message import EmailMessage
 from html import escape
 
