@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by 269 automated tests that run offline. Remaining work: multi-user accounts, deeper fact-checking and demo screenshots (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by automated tests that all run offline. Next: Docker verification, multi-user accounts and production hardening (see the roadmap below).
 
 ## Project summary
 
@@ -60,7 +60,7 @@ Python 3.11, FastAPI, LangGraph, Google Gemini (summaries, analysis, embeddings)
 python -m venv venv
 venv\Scripts\activate            # Windows (Linux/Mac: source venv/bin/activate)
 pip install -r requirements.txt
-copy .env.example .env           # then fill in your Gemini key and Gmail App Password
+copy .env.example .env           # Windows (Linux/Mac: cp .env.example .env), then fill in your Gemini key and Gmail App Password
 ```
 
 ```bash
@@ -127,17 +127,55 @@ render.yaml, docker-compose.yml, Dockerfile
 | 26 | Claim check | One LLM call flags stories where outlets disagree on key details |
 | 27 | Research agent | Multi-step report with citations (POST /research, Research tab) |
 | 27b | Cross-outlet dedup | Same story from different outlets merged by title keywords; stricter Critical prompt |
+| 28 | Offline RSS tests | RSS collector tests use fake feeds; the whole suite runs without internet |
 
-### Remaining roadmap
+### Product roadmap
 
-| Priority | Item | Notes |
-|----------|------|-------|
-| 1 | Verify the Docker Compose stack | Compose file is ready; a full local run with PostgreSQL is still to be verified |
-| 2 | Offline RSS test | The RSS collector test still uses the live internet |
-| 3 | Multi-user accounts | Per-user interests, ranking and feed |
-| 4 | Deeper fact-checking | Per-claim extraction and verification against outside sources |
-| 5 | Deeper research | Outside web sources and follow-up searches |
-| 6 | Demo | Screenshots in the README |
+Each phase has a clear exit criterion. A phase is done only when its criterion is met and the tests pass.
+
+**Phase 0: Stabilize (exit: a fresh clone runs on any machine with one command)**
+
+| # | Item | Done when |
+|---|------|-----------|
+| 0.1 | Verify Docker Compose stack | `docker compose up` brings up PostgreSQL, API, scheduler and dashboard; `/health` is OK |
+| 0.2 | Lint and format in CI | ruff and a type check run in GitHub Actions |
+| 0.3 | Test coverage report | Coverage is measured in CI and a minimum threshold is enforced |
+| 0.4 | Database migrations | Alembic replaces create-all; schema changes are versioned |
+
+**Phase 1: Multi-user foundation (exit: two users see different feeds)**
+
+| # | Item | Done when |
+|---|------|-----------|
+| 1.1 | User accounts and login | Register, login and token-based auth replace the single shared API key |
+| 1.2 | Per-user interests and ranking | Each user has their own interests, priority boosts and feed |
+| 1.3 | Per-user delivery settings | Each user sets email, Telegram chat and digest time |
+| 1.4 | User-managed sources | Users can add or remove their own RSS feeds and YouTube channels |
+
+**Phase 2: Intelligence quality (exit: measurable accuracy gains)**
+
+| # | Item | Done when |
+|---|------|-----------|
+| 2.1 | Per-claim fact-checking | Claims are extracted and verified against outside sources |
+| 2.2 | Deeper research agent | Web sources and follow-up searches are added to the report |
+| 2.3 | Evaluation set | A small labelled set measures priority, dedup and answer quality over time |
+
+**Phase 3: Production readiness (exit: safe to run for real users)**
+
+| # | Item | Done when |
+|---|------|-----------|
+| 3.1 | Rate limiting and input validation | Abuse of public endpoints is blocked |
+| 3.2 | Structured logging and error monitoring | Failures are visible without reading raw logs |
+| 3.3 | Backups and data retention | Database backups run and old articles are cleaned up |
+| 3.4 | Secrets and security review | No secrets in the repo; dependencies are audited |
+| 3.5 | Scheduled video collection | `/run-videos` runs on a schedule, or the cloud IP limitation is documented |
+
+**Phase 4: Launch (exit: a stranger can understand and try it in five minutes)**
+
+| # | Item | Done when |
+|---|------|-----------|
+| 4.1 | Demo screenshots and short video | README shows the dashboard, email and Telegram alert |
+| 4.2 | License and contributing guide | LICENSE and CONTRIBUTING files are added |
+| 4.3 | Public live demo | A read-only demo instance is available |
 
 ## Design decisions
 
