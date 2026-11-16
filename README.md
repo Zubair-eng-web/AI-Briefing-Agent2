@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by 311 automated tests that all run offline (85% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Next: production hardening (rate limiting, logging), then Docker verification (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 300 automated tests that all run offline (85% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Next: backups, scheduled videos and per-user sources, then Docker verification (see the roadmap below).
 
 ## Project summary
 
@@ -98,6 +98,22 @@ Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `P
 
 The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.yml`) wakes the service and calls `/run-digest`, `/run-alerts` and `/run-weekly` on a schedule. Secrets (`API_URL`, `API_KEY`) live in the repository's Actions secrets.
 
+## Production checklist
+
+Set these in the Render service environment (never commit them):
+
+| Variable | Notes |
+|----------|-------|
+| `GEMINI_API_KEY`, `EMAIL_*` or `RESEND_API_KEY`, `DATABASE_URL` | Required for the pipeline |
+| `API_KEY` | Protects the core endpoints; also set it in the GitHub Actions secrets |
+| `AUTH_SECRET` | At least 32 random characters, generated separately from your local one |
+| `DASHBOARD_PASSWORD` | Protects the dashboard |
+| `TRUST_PROXY_HEADERS` | `true` on Render, so rate limits see the real client IP (leave `false` when not behind a proxy) |
+| `DEBUG` | `false` |
+| `AUTH_RATE_LIMIT`, `AUTH_RATE_WINDOW_SECONDS` | Defaults: 10 attempts per 300 seconds, `0` turns it off |
+
+The server logs one JSON line per request (method, path, status, duration, `request_id`) and answers every request with an `X-Request-ID` header, so a user can quote it when reporting a problem. Startup warns about unsafe settings. The rate limiter lives in memory: it resets on restart and is per instance.
+
 ## Project structure
 
 ```
@@ -106,11 +122,12 @@ app/
   agents/      summarizer, analyzer, factchecker, claim_checker, ranker,
                alert_agent, email_agent, research, deep_research,
                video_agent, weekly_email, user_digest
-  api/         routes, security, auth
+  api/         routes, security, auth, middleware
   collectors/  rss, youtube
   core/        config, database, models, storage, dedup, embeddings,
                search_store, interests, mailer, telegram_notifier, story, video,
-               users, tokens, personalize, migrate
+               users, tokens, personalize, migrate, ratelimit, logging_setup,
+               security_checks
   graph/       briefing (daily pipeline), alerts (breaking alerts)
 dashboard/     Streamlit app, accounts UI, API client, helpers
 tests/         automated tests (all external services are faked)
@@ -142,6 +159,8 @@ render.yaml, docker-compose.yml, Dockerfile
 | 32 | Dashboard accounts | Login and register in the sidebar, plus a My feed tab with per-user interests |
 | 33 | Per-user digest | Opted-in users get a daily email ranked by their own interests, at most one per day; one failing user never blocks the others |
 | 34 | Migrations baseline | Alembic baseline (`0001`) and `python -m app.core.migrate`, which also adopts existing databases without touching their data |
+| 35 | Rate limiting | Login and register are limited per IP, and login also per email (default 10 attempts per 5 minutes); answers 429 with `Retry-After` |
+| 36 | Logging and security checks | JSON logs, `X-Request-ID` on every response, hidden 500 details, security headers and startup warnings for unsafe settings |
 
 ### Product roadmap
 
@@ -175,10 +194,10 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 3.1 | Rate limiting and input validation | Abuse of public endpoints is blocked |
-| 3.2 | Structured logging and error monitoring | Failures are visible without reading raw logs |
+| 3.1 | Rate limiting and input validation (auth endpoints done) | Abuse of public endpoints is blocked |
+| 3.2 | Structured logging and error monitoring (logging done) | Failures are visible without reading raw logs; error alerts are still open |
 | 3.3 | Backups and data retention | Database backups run and old articles are cleaned up |
-| 3.4 | Secrets and security review | No secrets in the repo; dependencies are audited |
+| 3.4 | Secrets and security review (checks done) | No secrets in the repo (verified); startup checks run; dependency audit is still open |
 | 3.5 | Scheduled video collection | `/run-videos` runs on a schedule, or the cloud IP limitation is documented |
 
 **Phase 4: Launch (exit: a stranger can understand and try it in five minutes)**
