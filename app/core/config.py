@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     api_key: str = ""
     dashboard_password: str = ""
 
+    # User accounts: token signing secret (khali = login band), token ki umr (ghante)
+    auth_secret: str = ""
+    auth_token_hours: int = 72
+
     # Email HTTPS API se (cloud ke liye). Khali = Gmail SMTP (local)
     resend_api_key: str = ""
     resend_from: str = "AI Briefing <onboarding@resend.dev>"
