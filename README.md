@@ -200,6 +200,7 @@ render.yaml
 | 52 | Docs and setup sync | One-command setup scripts (no Docker), `scripts/sync_env_example.py` keeps `.env.example` in step with the settings and a test guards it, README brought up to date |
 | 53 | Demo mode and pinned deploy | `DEMO_MODE=true` makes an instance read-only (writes and logins answer 403, `/chat` and `/research` still work); Render builds from the pinned `requirements.txt`; Telegram keys added to `.env.example` |
 | 54 | Web source check | `POST /research/web` checks a claim or topic with Gemini Google Search grounding and returns the answer with real web links; it refuses to answer when no web source is found; limited to 20 requests per hour per IP; still works in demo mode |
+| 55 | Web check in dashboard | The Research tab has a "Web par check karein" section (claim in, answer and real web links out); the web check CLI prints one clean error line on quota or key problems |
 
 ### Product roadmap
 
@@ -257,6 +258,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 ## Notes and limitations
 
+- The web check uses Gemini Google Search grounding, which has its own quota. On the free tier it can answer 429; the API then returns 502 and `python -m app.agents.web_check` prints one clear error line.
 - Facebook, Instagram and X are not included because their APIs are restricted or paid.
 - YouTube transcripts use the unofficial `youtube-transcript-api` library. It works locally, but YouTube often blocks cloud IP addresses.
 - Al Jazeera was replaced by The Guardian because its feed refused connections from the development network.

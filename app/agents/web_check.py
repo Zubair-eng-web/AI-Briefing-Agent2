@@ -60,11 +60,25 @@ def web_check(text: str, client=None) -> dict:
     return {"text": text, "answer": answer, "sources": sources, "grounded": True}
 
 
-if __name__ == "__main__":
+def main(argv=None) -> int:
     import sys
 
-    query = " ".join(sys.argv[1:]) or input("Claim ya topic: ").strip()
-    result = web_check(query)
+    args = sys.argv[1:] if argv is None else argv
+    query = " ".join(args) or input("Claim ya topic: ").strip()
+    try:
+        result = web_check(query)
+    except ValueError as e:  # GEMINI_API_KEY set nahi
+        print(f"[ERROR] {e}")
+        return 1
+    except ResearchError as e:
+        print(f"[ERROR] {str(e)[:200]}")
+        print("Quota ya network ka masla ho sakta hai: https://ai.dev/rate-limit")
+        return 1
     print(f"\n{result['answer']}\n")
     for s in result["sources"]:
         print(f"  - {s['title']}: {s['link']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -250,6 +250,26 @@ with research_tab:
         st.markdown(utils.md_safe(research_result["report"]))
         render_sources(research_result.get("sources"))
 
+    st.divider()
+    st.subheader("Web par check karein")
+    st.caption("Kisi claim ya topic ko Google Search se check karta hai (links ke saath, Gemini quota kharch hota hai).")
+    web_text = st.text_input("Claim ya topic", key="web_text")
+    if st.button("Web check karein"):
+        if len(web_text.strip()) < 3:
+            st.warning("Kam az kam 3 harf likhein.")
+        else:
+            try:
+                with st.spinner("Web par dhoond raha hoon..."):
+                    st.session_state.web_result = api_client.web_check(web_text.strip())
+            except api_client.ApiError as e:
+                st.warning(f"Web check nahi ho saka: {e}")
+
+    web_result = st.session_state.get("web_result")
+    if web_result:
+        st.markdown(utils.md_safe(web_result["answer"]))
+        for s in web_result.get("sources", []):
+            st.markdown("- " + utils.link_markdown(s["title"], s["link"]))
+
 with my_feed_tab:
     account.render_feed(limit)
     account.render_sources()
