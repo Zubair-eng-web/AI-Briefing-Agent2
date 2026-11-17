@@ -22,6 +22,7 @@ def dict_to_story(d: dict) -> Story:
     story.priority = d.get("priority", "Medium")
     story.sentiment = d.get("sentiment", "neutral")
     story.credibility = d.get("credibility", "Single source")
+    story.claims = d.get("claims", [])
     return story
 
 

@@ -147,7 +147,7 @@ app/
 dashboard/     Streamlit app, accounts UI, API client, helpers
 tests/         automated tests (all external services are faked)
 evals/         labelled dataset and quality evaluation
-migrations/    Alembic migration scripts (0001 baseline, 0002 user sources)
+migrations/    Alembic migration scripts (0001 baseline, 0002 user sources, 0003 story claims)
 .github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
 render.yaml, docker-compose.yml, Dockerfile
 ```
@@ -184,6 +184,7 @@ render.yaml, docker-compose.yml, Dockerfile
 | 41 | Dedup tuning | A title+summary overlap rule merges the same story told with different words; on the 8-case evaluation set dedup scores precision 1.0 and recall 1.0 (the set is small, see Evaluation) |
 | 42 | Per-claim support | One extra LLM call extracts up to 3 key claims for multi-outlet stories and marks each as confirmed, disputed or single source by outlet; shown in the digest email |
 | 43 | Claim check wired into the daily graph | The `claims` step now runs in the briefing graph; before this the claim check only ran in the standalone pipeline |
+| 44 | Claims in database, API and dashboard | `stories.claims_json` (migration `0003`); `/stories` and `/me/feed` return `claims`; dashboard cards and per-user digests show them. App startup now runs Alembic migrations once per process |
 
 ### Product roadmap
 
@@ -194,7 +195,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | # | Item | Done when |
 |---|------|-----------|
 | 0.1 | Verify Docker Compose stack (planned last) | `docker compose up` brings up PostgreSQL, API, scheduler and dashboard; `/health` is OK |
-| 0.4 | Database migrations | Baseline and upgrade command are done; app startup still uses create-all until the first schema change |
+| 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0003`), so existing databases get new columns |
 
 **Phase 1: Multi-user foundation (exit: two users see different feeds)**
 
@@ -209,7 +210,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets and shown in the email; saving them in the database, showing them in the API and dashboard, and verifying against outside sources are still open |
+| 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; verifying against outside sources is still open |
 | 2.2 | Deeper research agent | Web sources and follow-up searches are added to the report |
 | 2.3 | Evaluation set (dedup and priority done) | Answer-quality evaluation and a larger dataset are still open |
 

@@ -30,8 +30,17 @@ class Base(DeclarativeBase):
     pass
 
 
+_migrated = False
+
+
 def init_db():
-    """Saare tables banata hai (agar pehle se nahi hain)."""
+    """Tables banata hai aur (process me ek baar) migrations chalata hai."""
+    global _migrated
     from app.core import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    if not _migrated:
+        from app.core.migrate import upgrade_database
+
+        upgrade_database()
+        _migrated = True

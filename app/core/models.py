@@ -52,6 +52,7 @@ class StoryDB(Base):
     sentiment: Mapped[str] = mapped_column(String(20), default="neutral")
     credibility: Mapped[str] = mapped_column(String(50), default="Single source")
     sources_json: Mapped[str] = mapped_column(Text, default="[]")
+    claims_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 

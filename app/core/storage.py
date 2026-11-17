@@ -132,6 +132,7 @@ def save_stories(stories: list[Story]) -> None:
                     priority=s.priority,
                     sentiment=s.sentiment,
                     credibility=s.credibility,
+                    claims_json=json.dumps(getattr(s, "claims", None) or []),
                     sources_json=json.dumps([list(x) for x in s.sources]),
                     created_at=now,
                 )
@@ -144,6 +145,12 @@ def _story_to_dict(row: StoryDB) -> dict:
         sources = json.loads(row.sources_json or "[]")
     except ValueError:
         sources = []
+    try:
+        claims = json.loads(getattr(row, "claims_json", None) or "[]")
+    except ValueError:
+        claims = []
+    if not isinstance(claims, list):
+        claims = []
     return {
         "id": row.id,
         "title": row.title,
@@ -151,6 +158,7 @@ def _story_to_dict(row: StoryDB) -> dict:
         "priority": row.priority,
         "sentiment": row.sentiment,
         "credibility": row.credibility,
+        "claims": claims,
         "sources": [{"source": s[0], "link": s[1]} for s in sources if len(s) == 2],
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }

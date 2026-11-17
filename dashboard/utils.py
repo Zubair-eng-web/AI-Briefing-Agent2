@@ -58,6 +58,25 @@ def sources_markdown(sources: list[dict]) -> str:
     return " | ".join(parts)
 
 
+CLAIM_LABELS = {"confirmed": "confirmed", "disputed": "disputed", "single": "single source"}
+
+
+def _plain(text) -> str:
+    return md_safe(str(text).replace("[", "(").replace("]", ")"))
+
+
+def claims_markdown(claims) -> str:
+    """Story ke claims ki bullet list (confirmed / disputed / single source)."""
+    lines = []
+    for c in claims or []:
+        label = CLAIM_LABELS.get(c.get("status"), "single source")
+        who = ", ".join(c.get("supported_by", []))
+        against = ", ".join(c.get("contradicted_by", []))
+        detail = who + ("; against: " + against if against else "")
+        lines.append(f"- {_plain(c.get('claim', ''))} _[{label}: {_plain(detail)}]_")
+    return "\n".join(lines)
+
+
 def link_markdown(text: str, url: str) -> str:
     """Markdown link. Title ke [ ] badal deta hai taake link na toote."""
     label = md_safe(str(text).replace("[", "(").replace("]", ")"))

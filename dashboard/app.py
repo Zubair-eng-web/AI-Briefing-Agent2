@@ -81,6 +81,8 @@ def render_story(index, story):
             unsafe_allow_html=True,
         )
         st.markdown(utils.md_safe(story["summary"]))
+        if story.get("claims"):
+            st.markdown(utils.claims_markdown(story["claims"]))
         st.caption("Sources: " + utils.sources_markdown(story.get("sources", [])))
 
 

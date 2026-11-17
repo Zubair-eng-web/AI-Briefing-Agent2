@@ -73,3 +73,8 @@ def test_dict_to_story_keeps_fields():
     assert story.sources == [("BBC", "https://b.example")]
     assert (story.priority, story.sentiment) == ("High", "negative")
     assert story.credibility == "Confirmed by 2 sources"
+
+
+def test_dict_to_story_keeps_claims():
+    claims = [{"claim": "X", "supported_by": ["BBC"], "contradicted_by": [], "status": "single"}]
+    assert user_digest.dict_to_story({"title": "T", "claims": claims}).claims == claims
