@@ -180,6 +180,7 @@ render.yaml, docker-compose.yml, Dockerfile
 | 38 | User sources | Users add up to 8 RSS feeds or YouTube channels (`/me/sources`, dashboard form); only public http(s) URLs are accepted, re-checked before every collection; their stories carry a `(custom)` label; migration `0002` |
 | 39 | Evaluation set | `evals/` holds a labelled dataset and `python -m evals.run_eval` reports dedup precision/recall/F1 and (with `--priority`) priority accuracy, so prompt and ranking changes can be measured |
 | 40 | License and contributing guide | MIT `LICENSE` and `CONTRIBUTING.md` |
+| 41 | Dedup tuning | A title+summary overlap rule merges the same story told with different words; on the 8-case evaluation set dedup scores precision 1.0 and recall 1.0 (the set is small, see Evaluation) |
 
 ### Product roadmap
 
