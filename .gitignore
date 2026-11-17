@@ -20,3 +20,6 @@ backups/
 *.bak
 *.db
 bundle_*.txt
+
+context*.txt
+oracle_context.txt
