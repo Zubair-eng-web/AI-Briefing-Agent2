@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
-ALLOWED_POSTS = {"/chat", "/research"}
+ALLOWED_POSTS = {"/chat", "/research", "/research/web"}
 
 
 def is_blocked(method: str, path: str) -> bool:

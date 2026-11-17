@@ -168,3 +168,8 @@ def add_my_source(token: str, kind: str, url: str, name: str) -> dict:
 
 def delete_my_source(token: str, source_id: int) -> dict:
     return _request("DELETE", f"/me/sources/{source_id}", extra_headers=_bearer(token))
+
+
+def web_check(text: str) -> dict:
+    # Web search + Gemini, is liye lamba timeout
+    return _request("POST", "/research/web", timeout=90, json={"text": text})

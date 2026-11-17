@@ -90,7 +90,7 @@ Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, 
 
 ## API
 
-`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`, `/run-cleanup`, `/run-user-digests`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
+`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`, `/run-cleanup`, `/run-user-digests`, `/research/web`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
 
 Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (digest on/off, Telegram chat id, digest hour), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`.
 
@@ -199,6 +199,7 @@ render.yaml
 | 51 | Coverage | Offline tests for the pipeline, summarizer, video pipeline and the scheduler entry points (flags, job wiring, user digests after the main digest) |
 | 52 | Docs and setup sync | One-command setup scripts (no Docker), `scripts/sync_env_example.py` keeps `.env.example` in step with the settings and a test guards it, README brought up to date |
 | 53 | Demo mode and pinned deploy | `DEMO_MODE=true` makes an instance read-only (writes and logins answer 403, `/chat` and `/research` still work); Render builds from the pinned `requirements.txt`; Telegram keys added to `.env.example` |
+| 54 | Web source check | `POST /research/web` checks a claim or topic with Gemini Google Search grounding and returns the answer with real web links; it refuses to answer when no web source is found; limited to 20 requests per hour per IP; still works in demo mode |
 
 ### Product roadmap
 
@@ -223,8 +224,8 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; verifying against outside sources is still open |
-| 2.2 | Deeper research agent (sub-question report and follow-up search done; web sources still open) | Web sources and follow-up searches are added to the report |
+| 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; the outside-source check (`POST /research/web`) is done, using it inside email and dashboard is still open |
+| 2.2 | Deeper research agent (sub-question report and follow-up search done; web check endpoint done, web sources inside the report still open) | Web sources and follow-up searches are added to the report |
 | 2.3 | Evaluation set (dedup, priority, claims and answers done) | A larger dedup and claims set is still open |
 
 **Phase 3: Production readiness (exit: safe to run for real users)**
