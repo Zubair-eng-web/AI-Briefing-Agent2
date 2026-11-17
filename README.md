@@ -131,7 +131,7 @@ python -m evals.run_eval --priority   # priority accuracy (calls Gemini)
 python -m evals.run_eval --claims     # does the claim check catch contradicting outlets (calls Gemini)
 ```
 
-The labelled set lives in `evals/dataset.json`. Latest results with the real model (step 60): dedup 12 cases, precision and recall 1.0; claims 8 cases, accuracy 1.0; priority 24 cases, accuracy 1.0 (Critical precision and recall 1.0); answers 10 cases, answerable accuracy, retrieval hit rate and refusal rate all 1.0. The step 58 prompt change fixed the three local-news cases that used to be rated Low. The sets are small, so 1.0 means correct on these cases, not always correct. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
+The labelled set lives in `evals/dataset.json`. Latest results with the real model (step 60): dedup 12 cases, precision and recall 1.0; claims 11 cases, accuracy 1.0; priority 30 cases, accuracy 1.0 (Critical precision and recall 1.0); answers 10 cases, answerable accuracy, retrieval hit rate and refusal rate all 1.0. The step 58 prompt change fixed the three local-news cases that used to be rated Low. The sets are small, so 1.0 means correct on these cases, not always correct. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
 
 ## Project structure
 
@@ -214,6 +214,7 @@ render.yaml
 | 67 | Preflight check | `python -m scripts.preflight --env-file .env` lists missing or unsafe production settings (never prints values) before you deploy |
 | 68 | Digest web check setting | `DIGEST_WEB_CHECK` is now a real setting (works from `.env` and the Render environment), default off |
 | 69 | More eval cases | 6 more priority cases (30 total) and 4 more claim cases (12 total); re-run `--priority` and `--claims` to update the scores |
+| 70 | Evals re-run | After step 69 all eval sets still score 1.0 (priority 30 cases, claims 11 cases); README numbers updated |
 
 ### Product roadmap
 
