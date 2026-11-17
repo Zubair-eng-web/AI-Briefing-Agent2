@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
 
+    # Data retention: itne din se purane articles/embeddings delete (0 = band)
+    retention_days: int = 90
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

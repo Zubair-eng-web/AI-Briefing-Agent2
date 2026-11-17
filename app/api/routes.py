@@ -10,6 +10,7 @@ from app.core.storage import (
     get_stats,
 )
 from app.core.interests import get_interests, save_interests
+from app.core.maintenance import cleanup_old_data
 from app.core.story import PRIORITIES
 from app.scheduler import is_busy, run_alerts, run_digest, run_videos, run_weekly, safe_run
 from app.weekly import build_weekly_report
@@ -139,3 +140,9 @@ def research(req: ResearchRequest):
         raise HTTPException(status_code=503, detail=str(e))
     except ResearchError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/run-cleanup")
+def trigger_cleanup(background_tasks: BackgroundTasks):
+    """Purana data (retention) background me saaf karta hai."""
+    return _start(cleanup_old_data, "Cleanup", background_tasks)

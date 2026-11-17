@@ -5,6 +5,7 @@ on:
     - cron: "30 2 * * *"   # roz 07:30 Pakistan (02:30 UTC): digest
     - cron: "0 */3 * * *"  # har 3 ghante: breaking alert check
     - cron: "30 4 * * 0"   # har Sunday 09:30 Pakistan: weekly report
+    - cron: "0 3 * * 0"    # har Sunday 08:00 Pakistan: purana data saaf
   workflow_dispatch:
     inputs:
       job:
@@ -15,6 +16,7 @@ on:
           - alerts
           - weekly
           - videos
+          - cleanup
         default: digest
 
 jobs:
@@ -38,6 +40,8 @@ jobs:
             JOB="digest"
           elif [ "$SCHEDULE" = "30 4 * * 0" ]; then
             JOB="weekly"
+          elif [ "$SCHEDULE" = "0 3 * * 0" ]; then
+            JOB="cleanup"
           else
             JOB="alerts"
           fi

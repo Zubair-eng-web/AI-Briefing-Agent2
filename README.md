@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 300 automated tests that all run offline (85% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Next: backups, scheduled videos and per-user sources, then Docker verification (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 300 automated tests that all run offline (86% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Next: per-user sources, then Docker verification (see the roadmap below).
 
 ## Project summary
 
@@ -110,7 +110,8 @@ Set these in the Render service environment (never commit them):
 | `DASHBOARD_PASSWORD` | Protects the dashboard |
 | `TRUST_PROXY_HEADERS` | `true` on Render, so rate limits see the real client IP (leave `false` when not behind a proxy) |
 | `DEBUG` | `false` |
-| `AUTH_RATE_LIMIT`, `AUTH_RATE_WINDOW_SECONDS` | Defaults: 10 attempts per 300 seconds, `0` turns it off |
+| `AUTH_RATE_LIMIT`, `AUTH_RATE_WINDOW_SECONDS` | Defaults: 10 attempts per 300 seconds, `0` turns it off. The dashboard calls the API from one IP, so `render.yaml` sets 30 until the dashboard forwards client IPs |
+| `RETENTION_DAYS` | Default 90, `0` turns cleanup off |
 
 The server logs one JSON line per request (method, path, status, duration, `request_id`) and answers every request with an `X-Request-ID` header, so a user can quote it when reporting a problem. Startup warns about unsafe settings. The rate limiter lives in memory: it resets on restart and is per instance.
 
@@ -161,6 +162,7 @@ render.yaml, docker-compose.yml, Dockerfile
 | 34 | Migrations baseline | Alembic baseline (`0001`) and `python -m app.core.migrate`, which also adopts existing databases without touching their data |
 | 35 | Rate limiting | Login and register are limited per IP, and login also per email (default 10 attempts per 5 minutes); answers 429 with `Retry-After` |
 | 36 | Logging and security checks | JSON logs, `X-Request-ID` on every response, hidden 500 details, security headers and startup warnings for unsafe settings |
+| 37 | Retention and backup | `POST /run-cleanup` (weekly in GitHub Actions) deletes articles, digested records and embeddings older than `RETENTION_DAYS` (default 90); `python -m app.core.maintenance backup` makes a safe SQLite backup and keeps the newest 7 |
 
 ### Product roadmap
 
@@ -196,9 +198,9 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 |---|------|-----------|
 | 3.1 | Rate limiting and input validation (auth endpoints done) | Abuse of public endpoints is blocked |
 | 3.2 | Structured logging and error monitoring (logging done) | Failures are visible without reading raw logs; error alerts are still open |
-| 3.3 | Backups and data retention | Database backups run and old articles are cleaned up |
+| 3.3 | Backups and data retention (done) | Weekly cleanup runs; SQLite backup command exists; on PostgreSQL use the provider's backups or `pg_dump` |
 | 3.4 | Secrets and security review (checks done) | No secrets in the repo (verified); startup checks run; dependency audit is still open |
-| 3.5 | Scheduled video collection | `/run-videos` runs on a schedule, or the cloud IP limitation is documented |
+| 3.5 | Scheduled video collection (done) | The daily digest runs the video step first; YouTube may block cloud IPs (see notes) |
 
 **Phase 4: Launch (exit: a stranger can understand and try it in five minutes)**
 
