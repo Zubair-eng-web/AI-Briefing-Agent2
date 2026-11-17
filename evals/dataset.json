@@ -466,6 +466,36 @@
       "title": "Town holds annual kite festival",
       "summary": "Hundreds of families gathered at the park for the event.",
       "expected": "Low"
+    },
+    {
+      "title": "Airstrike hits hospital, dozens feared dead",
+      "summary": "Rescuers are searching the rubble of a hospital after an overnight airstrike.",
+      "expected": "Critical"
+    },
+    {
+      "title": "Central bank raises interest rates by half a point",
+      "summary": "The surprise move is expected to raise loan costs for millions of households.",
+      "expected": "High"
+    },
+    {
+      "title": "City council approves new bus route for suburbs",
+      "summary": "The route will connect two neighbourhoods to the main station from next month.",
+      "expected": "Medium"
+    },
+    {
+      "title": "Startup raises seed funding for food delivery app",
+      "summary": "The company plans to expand to three more cities next year.",
+      "expected": "Medium"
+    },
+    {
+      "title": "Annual flower festival opens in the park",
+      "summary": "Thousands of visitors are expected over the weekend.",
+      "expected": "Low"
+    },
+    {
+      "title": "Local team wins friendly cricket match",
+      "summary": "The match ended with a six wicket victory in front of a small crowd.",
+      "expected": "Low"
     }
   ],
   "claims": [
@@ -585,6 +615,51 @@
         [
           "BBC World",
           "City schools close on Friday due to heavy smog, officials said, and parents were told by text message."
+        ]
+      ],
+      "expected_disputed": false
+    },
+    {
+      "id": "flood-damage-conflict",
+      "title": "Flood damage estimate",
+      "evidence": [
+        [
+          "BBC World",
+          "Floods destroy 500 homes in the south, officials say."
+        ],
+        [
+          "Dawn",
+          "Floods damage about 5,000 homes in the south, local authorities say."
+        ]
+      ],
+      "expected_disputed": true
+    },
+    {
+      "id": "minister-resigns-conflict",
+      "title": "Minister resignation",
+      "evidence": [
+        [
+          "The Guardian",
+          "Finance minister resigns after the budget row, his office confirmed."
+        ],
+        [
+          "Dawn",
+          "Finance minister denies resigning and says he will stay in office."
+        ]
+      ],
+      "expected_disputed": true
+    },
+    {
+      "id": "rate-decision-consistent",
+      "title": "Interest rate decision",
+      "evidence": [
+        [
+          "BBC World",
+          "The central bank raised rates by 0.5 points on Thursday."
+        ],
+        [
+          "The Guardian",
+          "On Thursday the central bank lifted interest rates by half a point."
         ]
       ],
       "expected_disputed": false
