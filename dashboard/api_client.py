@@ -26,11 +26,27 @@ def _detail(response: httpx.Response) -> str:
     return f"API error {response.status_code}"
 
 
+def _forward_headers() -> dict:
+    """Dashboard ke visitor ka IP X-Forwarded-For me forward karti hai (rate limit sahi chale)."""
+    try:
+        import ipaddress
+
+        import streamlit as st
+
+        raw = st.context.headers.get("x-forwarded-for", "")
+        first = raw.split(",")[0].strip()
+        ipaddress.ip_address(first)  # galat/ganda value ho to ValueError, hum chhor dete hain
+    except Exception:
+        return {}
+    return {"X-Forwarded-For": first}
+
+
 def _request(
     method: str, path: str, timeout: float = 20.0, extra_headers: dict | None = None, **kwargs
 ):
     try:
         headers = {"X-API-Key": settings.api_key} if settings.api_key else {}
+        headers.update(_forward_headers())
         headers.update(extra_headers or {})
         with httpx.Client(
             base_url=base_url(), timeout=timeout, transport=_transport, headers=headers

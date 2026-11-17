@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 450 automated tests that all run offline (89% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: a public read-only demo, screenshots and outside-source fact checking.
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 450 automated tests that all run offline (89% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: deploy the public demo, screenshots and web sources inside the research report.
 
 ## Project summary
 
@@ -127,7 +127,7 @@ python -m evals.run_eval --priority   # priority accuracy (calls Gemini)
 python -m evals.run_eval --claims     # does the claim check catch contradicting outlets (calls Gemini)
 ```
 
-The labelled set lives in `evals/dataset.json`. Latest results with the real model (step 56): dedup 12 cases, precision and recall 1.0; claims 8 cases, accuracy 1.0; priority 24 cases, accuracy 0.875 (within one tier 1.0, Critical precision and recall 1.0). The misses are local civic news (library, campus, bike lanes) that the model rates Low where the label says Medium. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
+The labelled set lives in `evals/dataset.json`. Latest results with the real model (step 60): dedup 12 cases, precision and recall 1.0; claims 8 cases, accuracy 1.0; priority 24 cases, accuracy 1.0 (Critical precision and recall 1.0); answers 10 cases, answerable accuracy, retrieval hit rate and refusal rate all 1.0. The step 58 prompt change fixed the three local-news cases that used to be rated Low. The sets are small, so 1.0 means correct on these cases, not always correct. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
 
 ## Project structure
 
@@ -200,6 +200,9 @@ render.yaml
 | 56 | Bigger evaluation sets | 4 more dedup cases (two merge cases, two look-alike traps), 8 more priority cases and 4 more claim cases; the claim eval test now computes its expected numbers from the dataset, so the set can keep growing |
 | 57 | Secret scan and README order | `tests/test_secret_scan.py` scans every tracked file for key patterns (Gemini, GitHub, Resend, Telegram, private keys) and checks that no `.env` or `.db` file is tracked; README sections reordered and the latest evaluation results recorded |
 | 58 | Priority prompt and web quota message | The analyzer prompt now says that local civic and infrastructure news, education and business news are Medium, and that festivals and social events are Low (fixes the three Medium-labelled cases the model rated Low); the web check turns a quota error into one clear message |
+| 59 | Demo seed data | `python -m scripts.seed_demo` fills sample stories, articles and videos (only when empty, `--force` to redo); `render-demo.yaml` deploys a read-only demo (`DEMO_MODE=true`) that seeds itself on every start, no Docker |
+| 60 | Evals re-run | Priority accuracy rose from 0.875 to 1.0 after the step 58 prompt fix; all eval sets score 1.0 and README numbers are updated |
+| 61 | Client IP forwarding | The dashboard forwards each visitor's IP in `X-Forwarded-For` so login rate limits count real users, not the dashboard's single IP; nothing is sent when the IP is unknown |
 
 ### Product roadmap
 
