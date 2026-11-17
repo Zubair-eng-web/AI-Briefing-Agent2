@@ -16,3 +16,5 @@ youtube-transcript-api
 streamlit
 psycopg[binary]
 tzdata
+alembic
+Mako
