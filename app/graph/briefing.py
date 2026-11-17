@@ -1,4 +1,5 @@
 import operator
+import os
 from typing import Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -7,6 +8,7 @@ from app.agents.alert_agent import send_alert
 from app.agents.analyzer import analyze_stories
 from app.agents.claim_checker import check_claims
 from app.agents.claim_support import check_claim_support
+from app.agents.digest_web import collect_web_checks
 from app.agents.email_agent import send_email
 from app.agents.factchecker import check_credibility
 from app.agents.ranker import rank_stories
@@ -42,6 +44,7 @@ def build_briefing_graph(
     digest_marker=None,
     story_saver=None,
     video_loader=None,
+    web_checker=None,
     limit_per_feed: int = 5,
     max_stories: int = 10,
     candidate_pool: int = 15,
@@ -50,6 +53,8 @@ def build_briefing_graph(
 ):
     """Briefing ka LangGraph banata hai. Saari dependencies inject ho sakti hain (testing ke liye)."""
     holder = {"client": client}
+    if web_checker is None and os.getenv("DIGEST_WEB_CHECK", "").lower() == "true":
+        from app.agents.web_check import web_check as web_checker
 
     def ai():
         # Gemini client tabhi banta hai jab sach me zaroorat ho
@@ -124,10 +129,13 @@ def build_briefing_graph(
 
     def email_node(state: BriefingState):
         videos = video_loader() if video_loader is not None else []
+        web = collect_web_checks(state["stories"], web_checker) if web_checker else []
+        extras = {}
         if videos:
-            sender(state["stories"], videos=videos)
-        else:
-            sender(state["stories"])
+            extras["videos"] = videos
+        if web:
+            extras["web_checks"] = web
+        sender(state["stories"], **extras)
         extra = f" and {len(videos)} videos" if videos else ""
         if story_saver is not None:
             story_saver(state["stories"])
@@ -171,7 +179,7 @@ if __name__ == "__main__":
 
     options = {"only_new": "--all" not in sys.argv, "selector": get_undigested_articles}
     if "--no-email" in sys.argv:
-        options["sender"] = lambda stories, videos=None: print("(digest email skip ki gayi: --no-email)")
+        options["sender"] = lambda stories, videos=None, web_checks=None: print("(digest email skip ki gayi: --no-email)")
         options["alert_sender"] = lambda stories: print(
             f"(alert skip ki gayi: --no-email, {len(stories)} critical stories)"
         )

@@ -210,6 +210,7 @@ render.yaml
 | 62 | README Phase 0 table | Phase 0 items 0.1 to 0.3 (one-command setup, offline tests and CI, config sync) are listed again next to 0.4 |
 | 63 | Web sources in research report | `RESEARCH_WEB=true` adds the Google Search grounded answer and real links to `POST /research` (`web` field) and to the dashboard Research tab; needs a billed Gemini key, off by default; any quota or network error leaves the normal report untouched |
 | 64 | Demo deploy kit | `scripts/smoke_demo.py` checks a deployed demo (health, docs, writes blocked), `docs/DEMO_DEPLOY.md` explains the Render deploy and the screenshots, `docs/screenshots/` is ready |
+| 66 | Web check in digest email | With `DIGEST_WEB_CHECK=true` the daily digest adds a Web check section for up to 2 Critical/High stories (disputed ones first) with real web links; needs a billed Gemini key, off by default, any error leaves the normal email untouched |
 
 ### Product roadmap
 
