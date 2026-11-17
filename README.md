@@ -98,6 +98,10 @@ Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `P
 
 The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.yml`) wakes the service and calls `/run-digest`, `/run-alerts` and `/run-weekly` on a schedule. Secrets (`API_URL`, `API_KEY`) live in the repository's Actions secrets.
 
+## Demo mode
+
+Set `DEMO_MODE=true` on a separate instance to make it read-only: every request that changes data (digests, accounts, settings, sources) answers 403, while reading, `/chat` and `/research` keep working. Use it for a public demo.
+
 ## Evaluation
 
 ```bash
@@ -194,6 +198,7 @@ render.yaml
 | 50 | Answer-quality evaluation | `python -m evals.run_eval --answers` runs the research chat on a small fixed news library: does it cite the right source, and does it refuse questions the news cannot answer (refusal is a text heuristic). The priority set grew from 8 to 16 cases |
 | 51 | Coverage | Offline tests for the pipeline, summarizer, video pipeline and the scheduler entry points (flags, job wiring, user digests after the main digest) |
 | 52 | Docs and setup sync | One-command setup scripts (no Docker), `scripts/sync_env_example.py` keeps `.env.example` in step with the settings and a test guards it, README brought up to date |
+| 53 | Demo mode and pinned deploy | `DEMO_MODE=true` makes an instance read-only (writes and logins answer 403, `/chat` and `/research` still work); Render builds from the pinned `requirements.txt`; Telegram keys added to `.env.example` |
 
 ### Product roadmap
 
@@ -238,7 +243,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 |---|------|-----------|
 | 4.1 | Demo screenshots and short video | README shows the dashboard, email and Telegram alert |
 | 4.2 | License and contributing guide (done) | LICENSE and CONTRIBUTING files are added |
-| 4.3 | Public live demo | A read-only demo instance is available |
+| 4.3 | Public live demo (`DEMO_MODE` done, deployment open) | A read-only demo instance is available |
 
 ## Design decisions
 

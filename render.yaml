@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     region: singapore
-    buildCommand: pip install -r requirements-runtime.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
@@ -46,7 +46,7 @@ services:
     runtime: python
     plan: free
     region: singapore
-    buildCommand: pip install -r requirements-runtime.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: streamlit run dashboard/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
     envVars:
       - key: PYTHON_VERSION

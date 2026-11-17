@@ -8,6 +8,7 @@ from app.api.routes import router
 from app.api.security import require_api_key
 from app.core import error_alerts
 from app.core.config import settings
+from app.api.demo import add_demo_guard
 from app.api.middleware import add_http_middleware
 from app.core.database import init_db
 from app.core.logging_setup import configure_logging
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
 configure_logging(settings.log_level, settings.log_json)
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 add_http_middleware(app)
+add_demo_guard(app)
 app.include_router(router, dependencies=[Depends(require_api_key)])
 app.include_router(auth_router)  # register/login khule hain, baaki routes API key se
 

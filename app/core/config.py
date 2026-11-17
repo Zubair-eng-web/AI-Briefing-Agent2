@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # Data retention: itne din se purane articles/embeddings delete (0 = band)
     retention_days: int = 90
 
+    # Read-only public demo: sirf padhne wale requests chalte hain
+    demo_mode: bool = False
+
     # Error alerts (Telegram + email); ek hi error ka alert cooldown ke baad dobara
     error_alerts: bool = True
     error_alert_cooldown_minutes: int = 60
