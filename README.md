@@ -212,6 +212,9 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
+| 0.1 | One-command setup (done) | `scripts/setup.ps1` and `scripts/setup.sh` prepare a fresh clone without Docker |
+| 0.2 | Offline tests and CI (done) | The whole suite runs without internet; GitHub Actions runs lint, tests and a coverage gate on every push |
+| 0.3 | Config in sync (done) | `scripts/sync_env_example.py` keeps `.env.example` in step with the settings and a test guards it |
 | 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0004`), so existing databases get new columns |
 
 **Phase 1: Multi-user foundation (exit: two users see different feeds)**
