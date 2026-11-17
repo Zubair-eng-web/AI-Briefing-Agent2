@@ -98,6 +98,19 @@ Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `P
 
 The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.yml`) wakes the service and calls `/run-digest`, `/run-alerts` and `/run-weekly` on a schedule. Secrets (`API_URL`, `API_KEY`) live in the repository's Actions secrets.
 
+## Evaluation
+
+```bash
+python -m evals.run_eval              # dedup precision / recall / F1 (offline)
+python -m evals.run_eval --priority   # priority accuracy (calls Gemini)
+```
+
+The labelled set lives in `evals/dataset.json`. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
+
+## License
+
+MIT, see `LICENSE`. Contributions are welcome, see `CONTRIBUTING.md`.
+
 ## Production checklist
 
 Set these in the Render service environment (never commit them):
@@ -132,6 +145,7 @@ app/
   graph/       briefing (daily pipeline), alerts (breaking alerts)
 dashboard/     Streamlit app, accounts UI, API client, helpers
 tests/         automated tests (all external services are faked)
+evals/         labelled dataset and quality evaluation
 migrations/    Alembic migration scripts (0001 baseline, 0002 user sources)
 .github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
 render.yaml, docker-compose.yml, Dockerfile
@@ -164,6 +178,8 @@ render.yaml, docker-compose.yml, Dockerfile
 | 36 | Logging and security checks | JSON logs, `X-Request-ID` on every response, hidden 500 details, security headers and startup warnings for unsafe settings |
 | 37 | Retention and backup | `POST /run-cleanup` (weekly in GitHub Actions) deletes articles, digested records and embeddings older than `RETENTION_DAYS` (default 90); `python -m app.core.maintenance backup` makes a safe SQLite backup and keeps the newest 7 |
 | 38 | User sources | Users add up to 8 RSS feeds or YouTube channels (`/me/sources`, dashboard form); only public http(s) URLs are accepted, re-checked before every collection; their stories carry a `(custom)` label; migration `0002` |
+| 39 | Evaluation set | `evals/` holds a labelled dataset and `python -m evals.run_eval` reports dedup precision/recall/F1 and (with `--priority`) priority accuracy, so prompt and ranking changes can be measured |
+| 40 | License and contributing guide | MIT `LICENSE` and `CONTRIBUTING.md` |
 
 ### Product roadmap
 
@@ -191,7 +207,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 |---|------|-----------|
 | 2.1 | Per-claim fact-checking | Claims are extracted and verified against outside sources |
 | 2.2 | Deeper research agent | Web sources and follow-up searches are added to the report |
-| 2.3 | Evaluation set | A small labelled set measures priority, dedup and answer quality over time |
+| 2.3 | Evaluation set (dedup and priority done) | Answer-quality evaluation and a larger dataset are still open |
 
 **Phase 3: Production readiness (exit: safe to run for real users)**
 
@@ -208,7 +224,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | # | Item | Done when |
 |---|------|-----------|
 | 4.1 | Demo screenshots and short video | README shows the dashboard, email and Telegram alert |
-| 4.2 | License and contributing guide | LICENSE and CONTRIBUTING files are added |
+| 4.2 | License and contributing guide (done) | LICENSE and CONTRIBUTING files are added |
 | 4.3 | Public live demo | A read-only demo instance is available |
 
 ## Design decisions
