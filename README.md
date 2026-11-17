@@ -201,6 +201,7 @@ render.yaml
 | 53 | Demo mode and pinned deploy | `DEMO_MODE=true` makes an instance read-only (writes and logins answer 403, `/chat` and `/research` still work); Render builds from the pinned `requirements.txt`; Telegram keys added to `.env.example` |
 | 54 | Web source check | `POST /research/web` checks a claim or topic with Gemini Google Search grounding and returns the answer with real web links; it refuses to answer when no web source is found; limited to 20 requests per hour per IP; still works in demo mode |
 | 55 | Web check in dashboard | The Research tab has a "Web par check karein" section (claim in, answer and real web links out); the web check CLI prints one clean error line on quota or key problems |
+| 56 | Bigger evaluation sets | 4 more dedup cases (two merge cases, two look-alike traps), 8 more priority cases and 4 more claim cases; the claim eval test now computes its expected numbers from the dataset, so the set can keep growing |
 
 ### Product roadmap
 
@@ -227,7 +228,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 |---|------|-----------|
 | 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; the outside-source check (`POST /research/web`) is done, using it inside email and dashboard is still open |
 | 2.2 | Deeper research agent (sub-question report and follow-up search done; web check endpoint done, web sources inside the report still open) | Web sources and follow-up searches are added to the report |
-| 2.3 | Evaluation set (dedup, priority, claims and answers done) | A larger dedup and claims set is still open |
+| 2.3 | Evaluation set (dedup, priority, claims and answers done) | The dedup and claims sets were extended in step 56; adding a case whenever the system errs stays open |
 
 **Phase 3: Production readiness (exit: safe to run for real users)**
 

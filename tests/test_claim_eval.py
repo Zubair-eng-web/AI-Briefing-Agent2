@@ -34,5 +34,6 @@ def test_perfect_checker_scores_one():
 
 def test_checker_that_never_disputes_misses_conflicts():
     result = evaluate_claims(DATA, make_checker(lambda c: False))
-    assert result["accuracy"] == 0.5
-    assert {m["id"] for m in result["misses"]} == {"death-toll-conflict", "match-winner-conflict"}
+    disputed_ids = {c["id"] for c in DATA["claims"] if c["expected_disputed"]}
+    assert result["accuracy"] == round(1 - len(disputed_ids) / len(DATA["claims"]), 3)
+    assert {m["id"] for m in result["misses"]} == disputed_ids

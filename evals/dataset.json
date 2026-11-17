@@ -232,6 +232,118 @@
           "h2"
         ]
       ]
+    },
+    {
+      "id": "flood-evacuation-two-outlets",
+      "articles": [
+        {
+          "id": "i1",
+          "source": "BBC World",
+          "title": "Flooding forces evacuation of villages along river in Bangladesh",
+          "summary": "Thousands of people left their homes as the river kept rising."
+        },
+        {
+          "id": "i2",
+          "source": "Dawn",
+          "title": "Bangladesh villages evacuated as river floods worsen",
+          "summary": "Officials said many families moved to higher ground."
+        },
+        {
+          "id": "i3",
+          "source": "TechCrunch",
+          "title": "Startup launches app that translates meetings live",
+          "summary": "The tool supports twelve languages and works on phones."
+        }
+      ],
+      "expected_groups": [
+        [
+          "i1",
+          "i2"
+        ],
+        [
+          "i3"
+        ]
+      ]
+    },
+    {
+      "id": "court-ruling-three-outlets",
+      "articles": [
+        {
+          "id": "j1",
+          "source": "BBC World",
+          "title": "Supreme court strikes down law on online speech",
+          "summary": "Judges said the law broke constitutional protections."
+        },
+        {
+          "id": "j2",
+          "source": "The Guardian",
+          "title": "Court strikes down online speech law in landmark ruling",
+          "summary": "The decision was welcomed by campaigners."
+        },
+        {
+          "id": "j3",
+          "source": "Dawn",
+          "title": "Online speech law struck down by supreme court",
+          "summary": "The ruling ends a long legal fight."
+        }
+      ],
+      "expected_groups": [
+        [
+          "j1",
+          "j2",
+          "j3"
+        ]
+      ]
+    },
+    {
+      "id": "trap-tesla-two-stories",
+      "articles": [
+        {
+          "id": "k1",
+          "source": "The Guardian",
+          "title": "Tesla recalls vehicles over braking software fault",
+          "summary": "Owners will be told to update the software at a service centre."
+        },
+        {
+          "id": "k2",
+          "source": "TechCrunch",
+          "title": "Tesla shares jump after strong quarterly earnings",
+          "summary": "Investors reacted to record deliveries and higher profit."
+        }
+      ],
+      "expected_groups": [
+        [
+          "k1"
+        ],
+        [
+          "k2"
+        ]
+      ]
+    },
+    {
+      "id": "trap-floods-different-countries",
+      "articles": [
+        {
+          "id": "l1",
+          "source": "Dawn",
+          "title": "Floods hit Sindh villages, thousands evacuated",
+          "summary": "Rescue boats are moving families to relief camps."
+        },
+        {
+          "id": "l2",
+          "source": "BBC World",
+          "title": "Floods hit Kenya villages after heavy rain",
+          "summary": "Aid agencies say crops were destroyed across the region."
+        }
+      ],
+      "expected_groups": [
+        [
+          "l1"
+        ],
+        [
+          "l2"
+        ]
+      ]
     }
   ],
   "priority": [
@@ -314,6 +426,46 @@
       "title": "Local bakery wins best croissant award",
       "summary": "The bakery received the prize at a regional food fair.",
       "expected": "Low"
+    },
+    {
+      "title": "Dam collapse floods towns, thousands missing",
+      "summary": "Rescue teams are searching flooded streets after the dam gave way overnight.",
+      "expected": "Critical"
+    },
+    {
+      "title": "Passenger plane crashes after takeoff",
+      "summary": "Emergency crews are at the site and authorities fear many casualties.",
+      "expected": "Critical"
+    },
+    {
+      "title": "Parliament passes controversial election law",
+      "summary": "The opposition says the changes favour the governing party.",
+      "expected": "High"
+    },
+    {
+      "title": "Major bank reports sharp rise in losses",
+      "summary": "Shares fell after the bank warned of further write-downs.",
+      "expected": "High"
+    },
+    {
+      "title": "Tech firm unveils new laptop line",
+      "summary": "The laptops go on sale next month with faster chips.",
+      "expected": "Medium"
+    },
+    {
+      "title": "City council approves new bike lanes",
+      "summary": "Construction on the first lanes starts in spring.",
+      "expected": "Medium"
+    },
+    {
+      "title": "Singer announces surprise album",
+      "summary": "The album will be released on streaming services this Friday.",
+      "expected": "Low"
+    },
+    {
+      "title": "Town holds annual kite festival",
+      "summary": "Hundreds of families gathered at the park for the event.",
+      "expected": "Low"
     }
   ],
   "claims": [
@@ -373,6 +525,66 @@
         [
           "Dawn",
           "Lahore factory fire leaves five people hurt, rescue officials say; the fire brigade stayed at the scene for hours."
+        ]
+      ],
+      "expected_disputed": false
+    },
+    {
+      "id": "strike-length-conflict",
+      "title": "Port strike length",
+      "evidence": [
+        [
+          "BBC World",
+          "Dock workers begin a 48-hour strike at the port, the union said on Monday."
+        ],
+        [
+          "Dawn",
+          "Dock workers begin a 72-hour strike at the port, the union said on Monday."
+        ]
+      ],
+      "expected_disputed": true
+    },
+    {
+      "id": "bill-vote-conflict",
+      "title": "Parliament vote count",
+      "evidence": [
+        [
+          "The Guardian",
+          "Parliament passes the housing bill by 210 votes to 140 after a long debate."
+        ],
+        [
+          "Dawn",
+          "Parliament passes the housing bill by 190 votes to 150 after a long debate."
+        ]
+      ],
+      "expected_disputed": true
+    },
+    {
+      "id": "launch-consistent",
+      "title": "Satellite launch",
+      "evidence": [
+        [
+          "BBC World",
+          "A rocket carrying a weather satellite lifted off on Tuesday and reached orbit."
+        ],
+        [
+          "TechCrunch",
+          "The weather satellite reached orbit after its rocket launched on Tuesday, the agency said."
+        ]
+      ],
+      "expected_disputed": false
+    },
+    {
+      "id": "school-closure-detail-only",
+      "title": "School closures",
+      "evidence": [
+        [
+          "Dawn",
+          "Schools in the city will stay closed on Friday because of heavy smog, officials said."
+        ],
+        [
+          "BBC World",
+          "City schools close on Friday due to heavy smog, officials said, and parents were told by text message."
         ]
       ],
       "expected_disputed": false
