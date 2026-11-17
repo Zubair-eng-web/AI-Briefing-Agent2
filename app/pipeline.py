@@ -11,6 +11,15 @@ from app.core.storage import save_new_articles
 from app.core.story import Story  # noqa: F401  (doosri files yahin se import karti hain)
 
 
+def pick_image(group) -> str:
+    """First story image found among the grouped articles (from RSS media tags)."""
+    for a in group:
+        url = (getattr(a, "extra", None) or {}).get("image", "")
+        if url:
+            return url
+    return ""
+
+
 def build_stories(
     articles: list[Article],
     client=None,
@@ -35,6 +44,7 @@ def build_stories(
                 summary=summary,
                 sources=[(a.source, a.link) for a in group],
                 evidence=[(a.source, f"{a.title}. {a.summary[:400]}") for a in group],
+                image_url=pick_image(group),
             )
         )
         if delay:

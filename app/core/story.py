@@ -14,4 +14,5 @@ class Story:
     credibility: str = "Single source"
     evidence: list[tuple[str, str]] = field(default_factory=list)  # (source, title + snippet), DB me save nahi hota
     claim_notes: str = ""
-    claims: list = field(default_factory=list)  # [{claim, supported_by, contradicted_by, status}]
+    claims: list = field(default_factory=list)
+    image_url: str = ""  # [{claim, supported_by, contradicted_by, status}]

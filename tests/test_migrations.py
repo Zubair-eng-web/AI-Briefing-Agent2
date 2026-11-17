@@ -7,6 +7,13 @@ from app.core import models  # noqa: F401
 from app.core.database import Base
 from app.core.migrate import upgrade_database
 
+import pathlib
+
+HEAD = sorted(
+    f.name[:4]
+    for f in (pathlib.Path(__file__).resolve().parent.parent / "migrations" / "versions").glob("0*.py")
+)[-1]
+
 
 @pytest.fixture
 def url(tmp_path):
@@ -24,7 +31,7 @@ def scalar(url, sql):
 
 def test_fresh_database_matches_models(url):
     upgrade_database(url)
-    assert scalar(url, "SELECT version_num FROM alembic_version") == "0004"
+    assert scalar(url, "SELECT version_num FROM alembic_version") == HEAD
     engine = create_engine(url)
     try:
         with engine.connect() as conn:
@@ -47,7 +54,7 @@ def test_legacy_database_is_stamped_and_data_kept(url):
     engine.dispose()
 
     upgrade_database(url)
-    assert scalar(url, "SELECT version_num FROM alembic_version") == "0004"
+    assert scalar(url, "SELECT version_num FROM alembic_version") == HEAD
     assert scalar(url, "SELECT value FROM app_settings WHERE key = 'interests'") == "ai"
 
 

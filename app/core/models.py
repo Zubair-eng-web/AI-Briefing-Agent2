@@ -17,6 +17,7 @@ class ArticleDB(Base):
     source: Mapped[str] = mapped_column(String(100))
     published: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    image_url: Mapped[str] = mapped_column(String(1000), default="")
 
 
 class AlertDB(Base):
@@ -53,6 +54,7 @@ class StoryDB(Base):
     credibility: Mapped[str] = mapped_column(String(50), default="Single source")
     sources_json: Mapped[str] = mapped_column(Text, default="[]")
     claims_json: Mapped[str] = mapped_column(Text, default="[]")
+    image_url: Mapped[str] = mapped_column(String(1000), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
@@ -132,3 +134,54 @@ class UserSourceDB(Base):
     name: Mapped[str] = mapped_column(String(100))
     url: Mapped[str] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class BookmarkDB(Base):
+    """Stories a user saved."""
+
+    __tablename__ = "bookmarks"
+    __table_args__ = (UniqueConstraint("user_id", "story_id", name="uq_user_bookmark"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    story_id: Mapped[int] = mapped_column(index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PipelineRunDB(Base):
+    """History of scheduler, API and CLI job runs (digest, alerts, videos, weekly...)."""
+
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job: Mapped[str] = mapped_column(String(50), index=True)
+    ok: Mapped[bool] = mapped_column(default=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    duration_ms: Mapped[int] = mapped_column(default=0)
+    detail: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(String(300), default="")
+
+
+class StoryReadDB(Base):
+    """Stories a user marked as read."""
+
+    __tablename__ = "story_reads"
+    __table_args__ = (UniqueConstraint("user_id", "story_id", name="uq_user_story_read"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    story_id: Mapped[int] = mapped_column(index=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SourceHealthDB(Base):
+    """Last collection result per source (feed or channel)."""
+
+    __tablename__ = "source_health"
+
+    name: Mapped[str] = mapped_column(String(100), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10))
+    last_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_ok_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_items: Mapped[int] = mapped_column(default=0)
+    last_error: Mapped[str] = mapped_column(String(300), default="")

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 
 from app.collectors.rss import Article
+from app.core.category import categorize
 from app.core.database import SessionLocal, init_db
 from app.core.models import AlertDB, ArticleDB, DigestedDB, SettingDB, StoryDB, VideoDB
 from app.core.story import PRIORITIES, Story
@@ -27,6 +28,7 @@ def save_new_articles(articles: list[Article]) -> list[Article]:
                     link=a.link,
                     summary=a.summary,
                     source=a.source[:100],
+                    image_url=(getattr(a, "extra", None) or {}).get("image", "")[:1000],
                     published=a.published,
                 )
             )
@@ -63,6 +65,7 @@ def get_undigested_articles(hours: int = 36) -> list[Article]:
                 summary=r.summary or "",
                 source=r.source,
                 published=r.published,
+                extra={"image": r.image_url} if r.image_url else {},
             )
             for r in rows
             if r.link not in done
@@ -117,6 +120,24 @@ def mark_alerted(stories: list[Story]) -> None:
         session.commit()
 
 
+def _recent_story_keys(session, days: int = 7) -> set[str]:
+    """Keys (first source link, else title) of stories saved in the last `days` days."""
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    keys: set[str] = set()
+    for sources_json, title in (
+        session.query(StoryDB.sources_json, StoryDB.title).filter(StoryDB.created_at >= cutoff).all()
+    ):
+        try:
+            sources = json.loads(sources_json or "[]")
+        except ValueError:
+            sources = []
+        if sources and len(sources[0]) == 2 and sources[0][1]:
+            keys.add(sources[0][1][:1000])
+        else:
+            keys.add((title or "")[:1000])
+    return keys
+
+
 def save_stories(stories: list[Story]) -> None:
     """Digest ki stories DB me save karta hai (API aur dashboard ke liye)."""
     if not stories:
@@ -124,7 +145,12 @@ def save_stories(stories: list[Story]) -> None:
     init_db()
     now = datetime.utcnow()  # ek digest ki saari stories ka ek hi waqt
     with SessionLocal() as session:
+        known = _recent_story_keys(session)
         for s in stories:  # rank ke order me save hoti hain, is liye id se order milta hai
+            key = story_key(s)
+            if key in known:  # same story pehle kisi digest me save ho chuki hai
+                continue
+            known.add(key)
             session.add(
                 StoryDB(
                     title=s.title[:500],
@@ -133,6 +159,7 @@ def save_stories(stories: list[Story]) -> None:
                     sentiment=s.sentiment,
                     credibility=s.credibility,
                     claims_json=json.dumps(getattr(s, "claims", None) or []),
+                    image_url=(getattr(s, "image_url", "") or "")[:1000],
                     sources_json=json.dumps([list(x) for x in s.sources]),
                     created_at=now,
                 )
@@ -159,6 +186,8 @@ def _story_to_dict(row: StoryDB) -> dict:
         "sentiment": row.sentiment,
         "credibility": row.credibility,
         "claims": claims,
+        "image_url": getattr(row, "image_url", "") or "",
+        "category": categorize(row.title, row.summary or ""),
         "sources": [{"source": s[0], "link": s[1]} for s in sources if len(s) == 2],
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }

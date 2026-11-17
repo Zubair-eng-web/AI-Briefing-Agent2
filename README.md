@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 480 automated tests that all run offline (89% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: deploy the public demo, web check inside the email, and screenshots.
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 600 automated tests that all run offline (87% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: deploy the public demo and screenshots. The ORACLE dashboard upgrade is in progress (see the ORACLE upgrade section).
 
 ## Project summary
 
@@ -92,7 +92,7 @@ Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, 
 
 `GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`, `/run-cleanup`, `/run-user-digests`, `/research/web`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
 
-Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (digest on/off, Telegram chat id, digest hour), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`.
+Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (digest on/off, Telegram chat id, digest hour), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`. Bookmarks: `GET /me/bookmarks`, `PUT` and `DELETE /me/bookmarks/{story_id}`. Read status: `GET /me/reads`, `PUT` and `DELETE /me/reads/{story_id}`. Read-only helpers: `GET /related?q=`, `GET /oracle/analytics`, `/oracle/system`, `/oracle/alerts`, `/oracle/runs`, `/oracle/sources`.
 
 ## Demo mode
 
@@ -146,13 +146,14 @@ app/
   core/        config, database, models, storage, dedup, embeddings,
                search_store, interests, mailer, telegram_notifier, story, video,
                users, tokens, personalize, migrate, ratelimit, logging_setup,
-               security_checks, maintenance, user_sources
+               security_checks, maintenance, user_sources, category, oracle_stats, runs, bookmarks, reads, source_health
   graph/       briefing (daily pipeline), alerts (breaking alerts)
 dashboard/     Streamlit app, accounts UI, API client, helpers
-scripts/       setup.ps1, setup.sh, sync_env_example.py
+dashboard/oracle/  ORACLE dashboard (theme, components, pages); entry point oracle_app.py
+scripts/       setup.ps1, setup.sh, sync_env_example.py, dedupe_stories.py
 tests/         automated tests (all external services are faked)
 evals/         labelled dataset and quality evaluation
-migrations/    Alembic migration scripts (0001 baseline, 0002 user sources, 0003 story claims, 0004 user delivery)
+migrations/    Alembic migration scripts (0001 baseline, 0002 user sources, 0003 story claims, 0004 user delivery, 0005 image_url, 0006 bookmarks, 0007 pipeline runs, 0008 story reads, 0009 source health)
 .github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
 render.yaml
 ```
@@ -227,7 +228,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | 0.1 | One-command setup (done) | `scripts/setup.ps1` and `scripts/setup.sh` prepare a fresh clone without Docker |
 | 0.2 | Offline tests and CI (done) | The whole suite runs without internet; GitHub Actions runs lint, tests and a coverage gate on every push |
 | 0.3 | Config in sync (done) | `scripts/sync_env_example.py` keeps `.env.example` in step with the settings and a test guards it |
-| 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0004`), so existing databases get new columns |
+| 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0009`), so existing databases get new columns |
 
 **Phase 1: Multi-user foundation (exit: two users see different feeds)**
 
@@ -242,8 +243,8 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; the outside-source check (`POST /research/web`) is done, using it inside email and dashboard is still open |
-| 2.2 | Deeper research agent (sub-question report and follow-up search done; web check endpoint done, web sources inside the report are opt-in with `RESEARCH_WEB=true` (step 63), email use still open) | Web sources and follow-up searches are added to the report |
+| 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; the outside-source check (`POST /research/web`) is done, it is also used in the dashboard (step 55) and, opt-in, in the digest email (step 66) |
+| 2.2 | Deeper research agent (sub-question report and follow-up search done; web check endpoint done, web sources inside the report are opt-in with `RESEARCH_WEB=true` (step 63), email use done in step 66) | Web sources and follow-up searches are added to the report |
 | 2.3 | Evaluation set (dedup, priority, claims and answers done) | The dedup and claims sets were extended in step 56; adding a case whenever the system errs stays open |
 
 **Phase 3: Production readiness (exit: safe to run for real users)**
@@ -260,7 +261,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 4.1 | Demo screenshots and short video | README shows the dashboard, email and Telegram alert |
+| 4.1 | Demo screenshots and short video (skipped by choice) | Not planned: the dashboard can be tried through the live demo instead |
 | 4.2 | License and contributing guide (done) | LICENSE and CONTRIBUTING files are added |
 | 4.3 | Public live demo (`DEMO_MODE` done, deployment open) | A read-only demo instance is available |
 
@@ -287,3 +288,60 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 ## License
 
 MIT, see `LICENSE`. Contributions are welcome, see `CONTRIBUTING.md`.
+
+## ORACLE upgrade
+
+The dashboard is being upgraded into ORACLE, a dark intelligence command center. The original dashboard (`dashboard/app.py`) is untouched and still works; ORACLE is a new entry point built on the same API, so nothing was removed.
+
+```bash
+streamlit run dashboard/oracle_app.py    # ORACLE dashboard (API must be running)
+streamlit run dashboard/app.py           # original dashboard
+```
+
+All numbers come from the real API. Parts that are not monitored yet are labelled "Not monitored yet", and nothing is faked or guessed (no invented locations).
+
+### Phases
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | Audit of the existing project and UI plan | Done |
+| 2 | Design system, 12-section sidebar, Overview dashboard | Done |
+| 3 | News Feed (thumbnails, categories, date filter, bookmarks) and YouTube Intelligence upgrade | Done |
+| 4 | AI Research and Research Chat upgrade | Done |
+| 5 | Analytics, Alerts and Sources Management (backend endpoints) | Done |
+| 6 | Missing functions: export, read/unread, daily report, story sharing | Done |
+| 7 | Final tests, bug fixing, screenshots and docs | Done |
+
+### ORACLE steps
+
+| # | Step | What was built |
+|---|------|----------------|
+| 71 | Audit | Feature audit of the repository, missing-functionality report, file and migration plan |
+| 72 | Theme, sidebar, overview | `dashboard/oracle/` (theme, components, logic, status, data, sidebar, pages) and `dashboard/oracle_app.py`; 12 working sections; KPI cards, Breaking News Center, source and sentiment charts, system status from real checks; `.streamlit/config.toml` dark theme; 13 offline tests |
+| 73 | Page tests | `tests/test_oracle_pages.py` runs every ORACLE page offline with Streamlit AppTest and a fake API, to keep the 80% coverage gate |
+| 74 | Thumbnails | RSS media, enclosure and link tags give a real `image_url` (only http/https); migration `0005` adds `image_url` to `articles` and `stories`; no image is ever invented |
+| 75 | Categories | `app/core/category.py` labels stories Politics, Conflict, Business, Technology, Sports, Health, Disaster, Crime or Other by keywords when they are read (no LLM call, old stories included) |
+| 76 | Bookmarks | `GET /me/bookmarks`, `PUT` and `DELETE /me/bookmarks/{story_id}` (login required, max 200 per user); migration `0006`; Save button on story cards and a Saved Stories page |
+| 77 | News Feed and YouTube upgrade | Category and date filters, CSV export (formula-safe), thumbnails; YouTube thumbnails (from the video id) and a By channel view; `scripts/clean_demo.py` removes seeded demo stories |
+| 78 | Related content | `GET /related?q=` returns related articles and videos by keyword search (no LLM call, no Gemini quota); the chat answer and its `query` field are unchanged |
+| 79 | Research Chat upgrade | Related articles and related videos under each answer, a clear "not supported by the collected news" message on refusals, suggested questions built from the latest critical story, chat download (.md) |
+| 80 | Research Center upgrade | The "Not covered" section has its own card, follow-up searches are listed, and the whole report (sub-questions, sources, web check) downloads as Markdown |
+| 81 | ORACLE read-only API | `GET /oracle/analytics?days=`, `/oracle/system`, `/oracle/alerts`, `/oracle/runs` and `/oracle/sources` (API key protected, no LLM calls, nothing invented); built in `app/core/oracle_stats.py` from real database rows |
+| 82 | Pipeline run history | `pipeline_runs` table (migration `0007`); every scheduler, API and CLI job is recorded with result, duration and error (`app/core/runs.py`); recording can never break a job |
+| 83 | Analytics Center | Priority, sentiment, category, daily and weekly trend, critical history, source performance, frequent title words and YouTube activity with 7/30/90 day filter |
+| 84 | Alerts and System Monitoring | Alert history from `alerts_sent`, email and Telegram configured status (no secrets shown), real checks for database, collector freshness, last job, last digest and AI key, plus recent errors and run history |
+| 85 | Sources Management and Overview | Every built-in and custom RSS feed and YouTube channel with stored item count, last collection time and status; Overview "Sources Monitored" now counts RSS and YouTube; per-source collection errors are not stored yet |
+| 86 | Read/Unread | `story_reads` table (migration `0008`); `GET /me/reads`, `PUT` and `DELETE /me/reads/{story_id}` (login required); Mark read button and Unread only filter in News Feed |
+| 87 | Intelligence Report | New ORACLE page: daily and weekly report from real stories and videos, downloadable as Markdown or printable HTML |
+| 88 | No duplicate stories | `save_stories` skips a story whose first source link was already saved in the last 7 days (reruns and `--all` no longer repeat stories); `python -m scripts.dedupe_stories` (dry run) and `--apply` clean old duplicates; read/unread API tests |
+| 89 | Source health | `source_health` table (migration `0009`); every RSS collection records last check, last success, item count and last error per feed; `/oracle/sources` returns `last_checked`, `last_items`, `last_error` (RSS feeds and YouTube channels) |
+| 90 | Source errors in the dashboard | Sources Management shows Last checked and Last error per source and warns when a collection failed |
+| 91 | Story sharing | Share box on every story card: text to copy (title, short summary, first safe link) and an email link |
+| 92 | Final checks | 600 offline tests pass, ruff is clean, README synced with the code; screenshots were skipped by choice |
+
+### Planned next
+
+- Phase 6 is done (source health, read/unread, report page with Markdown and HTML export, story sharing). Direct PDF export is optional and needs `fpdf2`
+- Thumbnails, categories and bookmarks are done (steps 74-77)
+- Read-only endpoints are done (`/oracle/*`, step 81) and existing endpoints are unchanged
+- Map of global news flow only if real location data exists

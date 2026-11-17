@@ -7,6 +7,7 @@ from typing import Optional
 import feedparser
 from bs4 import BeautifulSoup
 
+from app.core import source_health
 from app.core.user_sources import load_extra_feeds
 
 socket.setdefaulttimeout(10)
@@ -50,6 +51,37 @@ def parse_date(entry) -> Optional[datetime]:
     return None
 
 
+def _safe_image(url) -> str:
+    url = str(url or "").strip()
+    return url[:1000] if url.startswith(("http://", "https://")) else ""
+
+
+def extract_image(entry) -> str:
+    """Thumbnail URL from real feed tags only (media, enclosure, link). Empty if none."""
+    for key in ("media_thumbnail", "media_content"):
+        for item in entry.get(key) or []:
+            if not isinstance(item, dict):
+                continue
+            kind = str(item.get("type", ""))
+            if item.get("medium") == "video" or kind.startswith("video"):
+                continue
+            url = _safe_image(item.get("url"))
+            if url:
+                return url
+    for key in ("enclosures", "links"):
+        for item in entry.get(key) or []:
+            if isinstance(item, dict) and str(item.get("type", "")).startswith("image"):
+                url = _safe_image(item.get("href") or item.get("url"))
+                if url:
+                    return url
+    return ""
+
+
+def image_extra(entry) -> dict:
+    url = extract_image(entry)
+    return {"image": url} if url else {}
+
+
 def fetch_feed(source: str, url: str, limit: int = 10) -> list[Article]:
     """Ek feed se articles laata hai. Fail ho to khali list return karta hai."""
     feed = None
@@ -77,6 +109,7 @@ def fetch_feed(source: str, url: str, limit: int = 10) -> list[Article]:
                 summary=clean_html(entry.get("summary", "")),
                 source=source,
                 published=parse_date(entry),
+                extra=image_extra(entry),
             )
         )
     return articles
@@ -88,7 +121,14 @@ def collect_all(limit_per_feed: int = 10, extra_feeds: dict | None = None) -> li
     feeds.update(load_extra_feeds() if extra_feeds is None else extra_feeds)
     all_articles: list[Article] = []
     for source, url in feeds.items():
-        all_articles.extend(fetch_feed(source, url, limit_per_feed))
+        got = fetch_feed(source, url, limit_per_feed)
+        if got:
+            source_health.record(source, "rss", True, len(got))
+        else:
+            source_health.record(
+                source, "rss", False, 0, "No articles returned (feed unreachable, blocked or empty)"
+            )
+        all_articles.extend(got)
     return all_articles
 
 

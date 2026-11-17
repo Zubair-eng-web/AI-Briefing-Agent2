@@ -36,3 +36,15 @@ def _reset_rate_limits():
     reset_all()
     yield
     reset_all()
+
+
+@pytest.fixture(autouse=True)
+def _no_source_health_writes(monkeypatch):
+    """collect_all must not write to the real database during tests."""
+    import app.core.source_health as sh
+
+    def _blocked():
+        raise RuntimeError("real database blocked in tests")
+
+    monkeypatch.setattr(sh, "SessionLocal", _blocked)
+    monkeypatch.setattr(sh, "init_db", lambda: None)

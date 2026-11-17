@@ -189,3 +189,50 @@ def delete_my_source(token: str, source_id: int) -> dict:
 def web_check(text: str) -> dict:
     # Web search + Gemini, is liye lamba timeout
     return _request("POST", "/research/web", timeout=90, json={"text": text})
+
+
+def my_bookmarks(token: str) -> dict:
+    return _request("GET", "/me/bookmarks", extra_headers=_bearer(token))
+
+
+def add_bookmark(token: str, story_id: int) -> dict:
+    return _request("PUT", f"/me/bookmarks/{story_id}", extra_headers=_bearer(token))
+
+
+def remove_bookmark(token: str, story_id: int) -> dict:
+    return _request("DELETE", f"/me/bookmarks/{story_id}", extra_headers=_bearer(token))
+
+
+def related(query: str) -> dict:
+    return _request("GET", "/related", params={"q": query})
+
+
+def oracle_analytics(days: int = 30) -> dict:
+    return _request("GET", "/oracle/analytics", params={"days": days})
+
+
+def oracle_system() -> dict:
+    return _request("GET", "/oracle/system")
+
+
+def oracle_alerts(limit: int = 50) -> dict:
+    return _request("GET", "/oracle/alerts", params={"limit": limit})
+
+
+def oracle_runs(limit: int = 30) -> dict:
+    return _request("GET", "/oracle/runs", params={"limit": limit})
+
+
+def oracle_sources() -> dict:
+    return _request("GET", "/oracle/sources")
+
+def my_reads(token: str) -> dict:
+    return _request("GET", "/me/reads", extra_headers=_bearer(token))
+
+
+def mark_read(token: str, story_id: int) -> dict:
+    return _request("PUT", f"/me/reads/{story_id}", extra_headers=_bearer(token))
+
+
+def mark_unread(token: str, story_id: int) -> dict:
+    return _request("DELETE", f"/me/reads/{story_id}", extra_headers=_bearer(token))

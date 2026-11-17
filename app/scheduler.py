@@ -7,7 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.agents.user_digest import send_user_digests
-from app.core import error_alerts
+from app.core import error_alerts, runs
 from app.core.config import settings
 from app.core.storage import (
     get_recent_videos,
@@ -105,7 +105,7 @@ def safe_run(job, name: str) -> bool:
     """Job fail ho to bhi scheduler chalta rahe."""
     with _lock:
         try:
-            job()
+            runs.track(name, job)
             return True
         except Exception as e:
             print(f"[ERROR] {name} fail hui: {type(e).__name__}: {e}")
@@ -115,13 +115,13 @@ def safe_run(job, name: str) -> bool:
 
 def main() -> None:
     if "--digest-now" in sys.argv:
-        run_digest(include_all="--all" in sys.argv)
+        runs.track("Digest", lambda: run_digest(include_all="--all" in sys.argv))
         return
     if "--alerts-now" in sys.argv:
-        run_alerts()
+        runs.track("Alert check", run_alerts)
         return
     if "--videos-now" in sys.argv:
-        run_videos()
+        runs.track("Videos", run_videos)
         return
     if "--weekly-now" in sys.argv:
         run_weekly()

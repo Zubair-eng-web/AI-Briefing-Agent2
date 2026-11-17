@@ -4,8 +4,12 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 
 from app.api.auth import router as auth_router
+from app.api.bookmarks import router as bookmarks_router
+from app.api.reads import router as reads_router
 from app.api.routes import router
 from app.api.web_routes import router as web_router
+from app.api.related import router as related_router
+from app.api.oracle import router as oracle_router
 from app.api.security import require_api_key
 from app.core import error_alerts
 from app.core.config import settings
@@ -31,7 +35,11 @@ add_http_middleware(app)
 add_demo_guard(app)
 app.include_router(router, dependencies=[Depends(require_api_key)])
 app.include_router(web_router, dependencies=[Depends(require_api_key)])
-app.include_router(auth_router)  # register/login khule hain, baaki routes API key se
+app.include_router(related_router, dependencies=[Depends(require_api_key)])
+app.include_router(oracle_router, dependencies=[Depends(require_api_key)])
+app.include_router(auth_router)
+app.include_router(reads_router)
+app.include_router(bookmarks_router)  # register/login khule hain, baaki routes API key se
 
 
 @app.get("/")

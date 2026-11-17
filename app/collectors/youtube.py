@@ -5,6 +5,7 @@ from typing import Optional
 
 import feedparser
 
+from app.core import source_health
 from app.core.user_sources import load_extra_channels
 from app.core.video import Video
 
@@ -99,7 +100,15 @@ def collect_videos(
     videos: list[Video] = []
     for name, channel_id in channels.items():
         kept = 0
-        for video in fetcher(name, channel_id, fetch_limit):
+        fetched = fetcher(name, channel_id, fetch_limit)
+        if fetched:
+            source_health.record(name, "youtube", True, len(fetched))
+        else:
+            source_health.record(
+                name, "youtube", False, 0,
+                "No videos returned (wrong channel ID, blocked or empty)",
+            )
+        for video in fetched:
             if kept >= limit_per_channel:
                 break
             if not include_shorts and is_short(video):

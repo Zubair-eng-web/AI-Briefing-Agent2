@@ -1,0 +1,1659 @@
+﻿
+===== FILES WITH bookmarks =====
+E:\News_Sumrizer\ai-briefing-agent\app\main.py
+E:\News_Sumrizer\ai-briefing-agent\app\api\bookmarks.py
+E:\News_Sumrizer\ai-briefing-agent\app\core\bookmarks.py
+E:\News_Sumrizer\ai-briefing-agent\app\core\models.py
+E:\News_Sumrizer\ai-briefing-agent\dashboard\api_client.py
+E:\News_Sumrizer\ai-briefing-agent\dashboard\oracle_app.py
+E:\News_Sumrizer\ai-briefing-agent\dashboard\oracle\components.py
+E:\News_Sumrizer\ai-briefing-agent\dashboard\oracle\feed.py
+
+===== app\main.py =====
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI
+
+from app.api.auth import router as auth_router
+from app.api.bookmarks import router as bookmarks_router
+from app.api.routes import router
+from app.api.web_routes import router as web_router
+from app.api.related import router as related_router
+from app.api.oracle import router as oracle_router
+from app.api.security import require_api_key
+from app.core import error_alerts
+from app.core.config import settings
+from app.api.demo import add_demo_guard
+from app.api.middleware import add_http_middleware
+from app.core.database import init_db
+from app.core.logging_setup import configure_logging
+from app.core.security_checks import security_warnings
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()  # server start hote hi tables tayyar
+    error_alerts.install()
+    for warning in security_warnings(settings):
+        logging.getLogger("app.startup").warning(warning)
+    yield
+
+
+configure_logging(settings.log_level, settings.log_json)
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
+add_http_middleware(app)
+add_demo_guard(app)
+app.include_router(router, dependencies=[Depends(require_api_key)])
+app.include_router(web_router, dependencies=[Depends(require_api_key)])
+app.include_router(related_router, dependencies=[Depends(require_api_key)])
+app.include_router(oracle_router, dependencies=[Depends(require_api_key)])
+app.include_router(auth_router)
+app.include_router(bookmarks_router)  # register/login khule hain, baaki routes API key se
+
+
+@app.get("/")
+def root():
+    return {"message": f"{settings.app_name} is running"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "debug": settings.debug}
+
+===== app\core\storage.py =====
+import json
+from datetime import datetime, timedelta
+
+from sqlalchemy import func
+
+from app.collectors.rss import Article
+from app.core.category import categorize
+from app.core.database import SessionLocal, init_db
+from app.core.models import AlertDB, ArticleDB, DigestedDB, SettingDB, StoryDB, VideoDB
+from app.core.story import PRIORITIES, Story
+from app.core.video import VideoSummary
+
+
+def save_new_articles(articles: list[Article]) -> list[Article]:
+    """DB me sirf naye articles save karta hai, aur wahi return karta hai."""
+    init_db()
+    new_articles: list[Article] = []
+
+    with SessionLocal() as session:
+        existing_links = {row[0] for row in session.query(ArticleDB.link).all()}
+
+        for a in articles:
+            if a.link in existing_links:
+                continue
+            session.add(
+                ArticleDB(
+                    title=a.title[:500],
+                    link=a.link,
+                    summary=a.summary,
+                    source=a.source[:100],
+                    image_url=(getattr(a, "extra", None) or {}).get("image", "")[:1000],
+                    published=a.published,
+                )
+            )
+            existing_links.add(a.link)
+            new_articles.append(a)
+
+        session.commit()
+
+    return new_articles
+
+
+def count_articles() -> int:
+    init_db()
+    with SessionLocal() as session:
+        return session.query(ArticleDB).count()
+
+
+def get_undigested_articles(hours: int = 36) -> list[Article]:
+    """Pichle `hours` ghanton ke wo articles jo abhi tak kisi digest me nahi gaye."""
+    init_db()
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    with SessionLocal() as session:
+        done = {row[0] for row in session.query(DigestedDB.link).all()}
+        rows = (
+            session.query(ArticleDB)
+            .filter(ArticleDB.collected_at >= cutoff)
+            .order_by(ArticleDB.collected_at.desc())
+            .all()
+        )
+        return [
+            Article(
+                title=r.title,
+                link=r.link,
+                summary=r.summary or "",
+                source=r.source,
+                published=r.published,
+                extra={"image": r.image_url} if r.image_url else {},
+            )
+            for r in rows
+            if r.link not in done
+        ]
+
+
+def mark_digested(articles: list[Article]) -> None:
+    """Articles ko 'digest me chala gaya' likh deta hai."""
+    if not articles:
+        return
+    init_db()
+    with SessionLocal() as session:
+        existing = {row[0] for row in session.query(DigestedDB.link).all()}
+        for a in articles:
+            link = a.link[:1000]
+            if link in existing:
+                continue
+            session.add(DigestedDB(link=link))
+            existing.add(link)
+        session.commit()
+
+
+def story_key(story: Story) -> str:
+    """Story ki pehchan: us ka pehla source link."""
+    key = story.sources[0][1] if story.sources else story.title
+    return key[:1000]
+
+
+def filter_unalerted(stories: list[Story]) -> list[Story]:
+    """Sirf wo stories jin ka alert pehle nahi gaya."""
+    if not stories:
+        return []
+    init_db()
+    with SessionLocal() as session:
+        done = {row[0] for row in session.query(AlertDB.story_key).all()}
+    return [s for s in stories if story_key(s) not in done]
+
+
+def mark_alerted(stories: list[Story]) -> None:
+    """Stories ko 'alert bhej diya' likh deta hai."""
+    if not stories:
+        return
+    init_db()
+    with SessionLocal() as session:
+        existing = {row[0] for row in session.query(AlertDB.story_key).all()}
+        for s in stories:
+            key = story_key(s)
+            if key in existing:
+                continue
+            session.add(AlertDB(story_key=key, title=s.title[:500]))
+            existing.add(key)
+        session.commit()
+
+
+def save_stories(stories: list[Story]) -> None:
+    """Digest ki stories DB me save karta hai (API aur dashboard ke liye)."""
+    if not stories:
+        return
+    init_db()
+    now = datetime.utcnow()  # ek digest ki saari stories ka ek hi waqt
+    with SessionLocal() as session:
+        for s in stories:  # rank ke order me save hoti hain, is liye id se order milta hai
+            session.add(
+                StoryDB(
+                    title=s.title[:500],
+                    summary=s.summary,
+                    priority=s.priority,
+                    sentiment=s.sentiment,
+                    credibility=s.credibility,
+                    claims_json=json.dumps(getattr(s, "claims", None) or []),
+                    image_url=(getattr(s, "image_url", "") or "")[:1000],
+                    sources_json=json.dumps([list(x) for x in s.sources]),
+                    created_at=now,
+                )
+            )
+        session.commit()
+
+
+def _story_to_dict(row: StoryDB) -> dict:
+    try:
+        sources = json.loads(row.sources_json or "[]")
+    except ValueError:
+        sources = []
+    try:
+        claims = json.loads(getattr(row, "claims_json", None) or "[]")
+    except ValueError:
+        claims = []
+    if not isinstance(claims, list):
+        claims = []
+    return {
+        "id": row.id,
+        "title": row.title,
+        "summary": row.summary,
+        "priority": row.priority,
+        "sentiment": row.sentiment,
+        "credibility": row.credibility,
+        "claims": claims,
+        "image_url": getattr(row, "image_url", "") or "",
+        "category": categorize(row.title, row.summary or ""),
+        "sources": [{"source": s[0], "link": s[1]} for s in sources if len(s) == 2],
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+def get_recent_stories(
+    limit: int = 20, priority: str | None = None, hours: int | None = None
+) -> list[dict]:
+    """Sab se naya digest pehle, aur digest ke andar rank ke order me."""
+    init_db()
+    with SessionLocal() as session:
+        query = session.query(StoryDB)
+        if priority:
+            query = query.filter(StoryDB.priority == priority)
+        if hours:
+            query = query.filter(StoryDB.created_at >= datetime.utcnow() - timedelta(hours=hours))
+        rows = query.order_by(StoryDB.created_at.desc(), StoryDB.id.asc()).limit(limit).all()
+        return [_story_to_dict(r) for r in rows]
+
+
+def get_recent_articles(limit: int = 50) -> list[dict]:
+    init_db()
+    with SessionLocal() as session:
+        rows = session.query(ArticleDB).order_by(ArticleDB.collected_at.desc()).limit(limit).all()
+        return [
+            {
+                "id": r.id,
+                "title": r.title,
+                "link": r.link,
+                "source": r.source,
+                "published": r.published.isoformat() if r.published else None,
+                "collected_at": r.collected_at.isoformat() if r.collected_at else None,
+            }
+            for r in rows
+        ]
+
+
+def get_stats() -> dict:
+    init_db()
+    with SessionLocal() as session:
+        by_priority = {p: 0 for p in PRIORITIES}
+        for priority, n in (
+            session.query(StoryDB.priority, func.count(StoryDB.id)).group_by(StoryDB.priority).all()
+        ):
+            by_priority[priority] = n
+        return {
+            "articles": session.query(ArticleDB).count(),
+            "stories": session.query(StoryDB).count(),
+            "alerts_sent": session.query(AlertDB).count(),
+            "stories_by_priority": by_priority,
+        }
+
+
+def get_known_video_ids() -> set[str]:
+    """Jin videos ki summary pehle ban chuki hai."""
+    init_db()
+    with SessionLocal() as session:
+        return {row[0] for row in session.query(VideoDB.video_id).all()}
+
+
+def save_videos(videos: list[VideoSummary]) -> None:
+    """Video summaries save karta hai (pehle se maujood video dobara save nahi hoti)."""
+    if not videos:
+        return
+    init_db()
+    with SessionLocal() as session:
+        existing = {row[0] for row in session.query(VideoDB.video_id).all()}
+        for v in videos:
+            if v.video_id in existing:
+                continue
+            session.add(
+                VideoDB(
+                    video_id=v.video_id,
+                    title=v.title[:500],
+                    link=v.link[:1000],
+                    channel=v.channel[:100],
+                    published=v.published,
+                    summary=v.summary,
+                    key_points_json=json.dumps(v.key_points),
+                    takeaway=v.takeaway,
+                    has_transcript=v.has_transcript,
+                )
+            )
+            existing.add(v.video_id)
+        session.commit()
+
+
+def get_recent_videos(limit: int = 10, hours: int | None = None) -> list[dict]:
+    init_db()
+    with SessionLocal() as session:
+        query = session.query(VideoDB)
+        if hours:
+            query = query.filter(VideoDB.created_at >= datetime.utcnow() - timedelta(hours=hours))
+        rows = query.order_by(VideoDB.published.desc().nulls_last(), VideoDB.id.desc()).limit(limit).all()
+        result = []
+        for r in rows:
+            try:
+                points = json.loads(r.key_points_json or "[]")
+            except ValueError:
+                points = []
+            result.append(
+                {
+                    "video_id": r.video_id,
+                    "title": r.title,
+                    "link": r.link,
+                    "channel": r.channel,
+                    "published": r.published.isoformat() if r.published else None,
+                    "summary": r.summary,
+                    "key_points": points,
+                    "takeaway": r.takeaway,
+                    "has_transcript": bool(r.has_transcript),
+                }
+            )
+        return result
+
+
+def get_stories_between(start: datetime, end: datetime) -> list[dict]:
+    """Wo stories jin ka digest [start, end) me bana, naye pehle."""
+    init_db()
+    with SessionLocal() as session:
+        rows = (
+            session.query(StoryDB)
+            .filter(StoryDB.created_at >= start, StoryDB.created_at < end)
+            .order_by(StoryDB.created_at.desc(), StoryDB.id.asc())
+            .all()
+        )
+        return [_story_to_dict(r) for r in rows]
+
+
+def _video_to_dict(r: VideoDB) -> dict:
+    try:
+        points = json.loads(r.key_points_json or "[]")
+    except ValueError:
+        points = []
+    return {
+        "video_id": r.video_id,
+        "title": r.title,
+        "link": r.link,
+        "channel": r.channel,
+        "published": r.published.isoformat() if r.published else None,
+        "summary": r.summary,
+        "key_points": points,
+        "takeaway": r.takeaway,
+        "has_transcript": bool(r.has_transcript),
+    }
+
+
+def get_videos_between(start: datetime, end: datetime) -> list[dict]:
+    """Wo videos jin ki summary [start, end) me bani, naye pehle."""
+    init_db()
+    with SessionLocal() as session:
+        rows = (
+            session.query(VideoDB)
+            .filter(VideoDB.created_at >= start, VideoDB.created_at < end)
+            .order_by(VideoDB.published.desc().nulls_last(), VideoDB.id.desc())
+            .all()
+        )
+        return [_video_to_dict(r) for r in rows]
+
+
+def get_setting(key: str) -> str | None:
+    """Saved setting ki value, ya None agar kabhi save nahi hui."""
+    init_db()
+    with SessionLocal() as session:
+        row = session.get(SettingDB, key)
+        return row.value if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    init_db()
+    with SessionLocal() as session:
+        row = session.get(SettingDB, key)
+        if row:
+            row.value = value
+            row.updated_at = datetime.utcnow()
+        else:
+            session.add(SettingDB(key=key, value=value))
+        session.commit()
+
+===== app\core\story.py =====
+from dataclasses import dataclass, field
+
+PRIORITIES = ["Critical", "High", "Medium", "Low"]
+SENTIMENTS = ["positive", "negative", "neutral"]
+
+
+@dataclass
+class Story:
+    title: str
+    summary: str
+    sources: list[tuple[str, str]] = field(default_factory=list)  # (source, link)
+    priority: str = "Medium"
+    sentiment: str = "neutral"
+    credibility: str = "Single source"
+    evidence: list[tuple[str, str]] = field(default_factory=list)  # (source, title + snippet), DB me save nahi hota
+    claim_notes: str = ""
+    claims: list = field(default_factory=list)
+    image_url: str = ""  # [{claim, supported_by, contradicted_by, status}]
+
+===== app\core\database.py =====
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+from app.core.config import settings
+
+
+def normalize_database_url(url: str) -> str:
+    """Render 'postgres://' deta hai, SQLAlchemy ko 'postgresql+psycopg://' chahiye."""
+    url = (url or "").strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
+def engine_kwargs(url: str) -> dict:
+    if url.startswith("sqlite"):
+        return {"connect_args": {"check_same_thread": False}}
+    return {"pool_pre_ping": True}  # toote hue connections khud theek ho jate hain
+
+
+DATABASE_URL = normalize_database_url(settings.database_url)
+
+engine = create_engine(DATABASE_URL, **engine_kwargs(DATABASE_URL))
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+_migrated = False
+
+
+def init_db():
+    """Tables banata hai aur (process me ek baar) migrations chalata hai."""
+    global _migrated
+    from app.core import models  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)
+    if not _migrated:
+        from app.core.migrate import upgrade_database
+
+        upgrade_database()
+        _migrated = True
+
+===== dashboard\api_client.py =====
+import os
+
+import httpx
+
+from app.core.config import settings
+
+DEFAULT_URL = "http://127.0.0.1:8000"
+_transport = None  # tests yahan fake transport lagate hain
+
+
+class ApiError(Exception):
+    """API se rabta ya jawab me masla (dashboard ye message seedha dikhata hai)."""
+
+
+def base_url() -> str:
+    return os.getenv("API_URL", DEFAULT_URL).rstrip("/")
+
+
+def _detail(response: httpx.Response) -> str:
+    try:
+        detail = response.json().get("detail")
+    except (ValueError, AttributeError):
+        detail = None
+    if isinstance(detail, str) and detail:
+        return detail
+    return f"API error {response.status_code}"
+
+
+def _forward_headers() -> dict:
+    """Dashboard ke visitor ka IP X-Forwarded-For me forward karti hai (rate limit sahi chale)."""
+    try:
+        import ipaddress
+
+        import streamlit as st
+
+        raw = st.context.headers.get("x-forwarded-for", "")
+        first = raw.split(",")[0].strip()
+        ipaddress.ip_address(first)  # galat/ganda value ho to ValueError, hum chhor dete hain
+    except Exception:
+        return {}
+    return {"X-Forwarded-For": first}
+
+
+def _request(
+    method: str, path: str, timeout: float = 20.0, extra_headers: dict | None = None, **kwargs
+):
+    try:
+        headers = {"X-API-Key": settings.api_key} if settings.api_key else {}
+        headers.update(_forward_headers())
+        headers.update(extra_headers or {})
+        with httpx.Client(
+            base_url=base_url(), timeout=timeout, transport=_transport, headers=headers
+        ) as client:
+            response = client.request(method, path, **kwargs)
+    except httpx.ConnectError:
+        raise ApiError(
+            "API server se connection nahi ho paya. Pehle server chalayein: "
+            "uvicorn app.main:app --reload"
+        ) from None
+    except httpx.TimeoutException:
+        raise ApiError("API ne waqt par jawab nahi diya (timeout). Dobara try karein.") from None
+    except httpx.HTTPError as e:
+        raise ApiError(f"Network error: {type(e).__name__}") from None
+
+    if response.status_code >= 400:
+        raise ApiError(_detail(response))
+    return response.json()
+
+
+def health() -> dict:
+    return _request("GET", "/health", timeout=5)
+
+
+def get_stories(limit: int = 20, priority: str | None = None, hours: int | None = None) -> dict:
+    params: dict = {"limit": limit}
+    if priority:
+        params["priority"] = priority
+    if hours:
+        params["hours"] = hours
+    return _request("GET", "/stories", params=params)
+
+
+def get_stats() -> dict:
+    return _request("GET", "/stats")
+
+
+def get_articles(limit: int = 50) -> dict:
+    return _request("GET", "/articles", params={"limit": limit})
+
+
+def ask(question: str) -> dict:
+    # Chat me 2-3 Gemini calls lagti hain (pehli baar embeddings bhi), is liye lamba timeout
+    return _request("POST", "/chat", timeout=90, json={"question": question})
+
+
+def run_digest() -> dict:
+    return _request("POST", "/run-digest")
+
+
+def run_alerts() -> dict:
+    return _request("POST", "/run-alerts")
+
+
+def get_videos(limit: int = 10) -> dict:
+    return _request("GET", "/videos", params={"limit": limit})
+
+
+def run_videos() -> dict:
+    return _request("POST", "/run-videos")
+
+
+def get_interests() -> dict:
+    return _request("GET", "/interests")
+
+
+def save_interests(interests: str) -> dict:
+    return _request("PUT", "/interests", json={"interests": interests})
+
+
+def research(topic: str) -> dict:
+    # 2 Gemini calls + embeddings, is liye lamba timeout
+    return _request("POST", "/research", timeout=120, json={"topic": topic})
+
+
+def _bearer(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def register(email: str, password: str) -> dict:
+    return _request("POST", "/auth/register", json={"email": email, "password": password})
+
+
+def login(email: str, password: str) -> dict:
+    return _request("POST", "/auth/login", json={"email": email, "password": password})
+
+
+def my_feed(token: str, limit: int = 20, scope: str = "all") -> dict:
+    params: dict = {"limit": limit}
+    if scope != "all":
+        params["scope"] = scope
+    return _request("GET", "/me/feed", params=params, extra_headers=_bearer(token))
+
+
+def save_my_interests(token: str, interests: str) -> dict:
+    return _request(
+        "PUT", "/me/interests", json={"interests": interests}, extra_headers=_bearer(token)
+    )
+
+
+def get_delivery(token: str) -> dict:
+    return _request("GET", "/me/delivery", extra_headers=_bearer(token))
+
+
+_UNSET = object()
+
+
+def save_delivery(
+    token: str, digest_enabled=_UNSET, telegram_chat_id=_UNSET, digest_hour=_UNSET
+) -> dict:
+    """Sirf wahi fields bhejti hai jo di gayi hon (digest_hour=None matlab main digest ke saath)."""
+    body = {}
+    for key, value in (
+        ("digest_enabled", digest_enabled),
+        ("telegram_chat_id", telegram_chat_id),
+        ("digest_hour", digest_hour),
+    ):
+        if value is not _UNSET:
+            body[key] = value
+    return _request("PUT", "/me/delivery", json=body, extra_headers=_bearer(token))
+
+
+def my_sources(token: str) -> dict:
+    return _request("GET", "/me/sources", extra_headers=_bearer(token))
+
+
+def add_my_source(token: str, kind: str, url: str, name: str) -> dict:
+    return _request(
+        "POST",
+        "/me/sources",
+        json={"kind": kind, "url": url, "name": name},
+        extra_headers=_bearer(token),
+    )
+
+
+def delete_my_source(token: str, source_id: int) -> dict:
+    return _request("DELETE", f"/me/sources/{source_id}", extra_headers=_bearer(token))
+
+
+def web_check(text: str) -> dict:
+    # Web search + Gemini, is liye lamba timeout
+    return _request("POST", "/research/web", timeout=90, json={"text": text})
+
+
+def my_bookmarks(token: str) -> dict:
+    return _request("GET", "/me/bookmarks", extra_headers=_bearer(token))
+
+
+def add_bookmark(token: str, story_id: int) -> dict:
+    return _request("PUT", f"/me/bookmarks/{story_id}", extra_headers=_bearer(token))
+
+
+def remove_bookmark(token: str, story_id: int) -> dict:
+    return _request("DELETE", f"/me/bookmarks/{story_id}", extra_headers=_bearer(token))
+
+
+def related(query: str) -> dict:
+    return _request("GET", "/related", params={"q": query})
+
+
+def oracle_analytics(days: int = 30) -> dict:
+    return _request("GET", "/oracle/analytics", params={"days": days})
+
+
+def oracle_system() -> dict:
+    return _request("GET", "/oracle/system")
+
+
+def oracle_alerts(limit: int = 50) -> dict:
+    return _request("GET", "/oracle/alerts", params={"limit": limit})
+
+
+def oracle_runs(limit: int = 30) -> dict:
+    return _request("GET", "/oracle/runs", params={"limit": limit})
+
+
+def oracle_sources() -> dict:
+    return _request("GET", "/oracle/sources")
+
+===== dashboard\oracle\data.py =====
+"""Cached API reads for the ORACLE dashboard. Errors (ApiError) are never cached."""
+import streamlit as st
+
+from dashboard import api_client
+from dashboard.oracle import status
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def stories(limit: int = 20, priority: str | None = None) -> list[dict]:
+    return api_client.get_stories(limit=limit, priority=priority)["stories"]
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def stats() -> dict:
+    return api_client.get_stats()
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def videos(limit: int = 10) -> list[dict]:
+    return api_client.get_videos(limit=limit)["videos"]
+
+
+@st.cache_data(ttl=10, show_spinner=False)
+def health() -> dict:
+    return api_client.health()
+
+
+def refresh() -> None:
+    st.cache_data.clear()
+
+
+def run_job(label: str, fn) -> None:
+    try:
+        fn()
+        st.success(f"{label} started. Press Refresh data in a little while.")
+    except api_client.ApiError as e:
+        st.warning(str(e))
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def oracle_analytics(days: int = 30) -> dict:
+    return api_client.oracle_analytics(days)
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def oracle_system() -> dict:
+    return api_client.oracle_system()
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def oracle_alerts() -> dict:
+    return api_client.oracle_alerts()
+
+
+@st.cache_data(ttl=15, show_spinner=False)
+def oracle_runs(limit: int = 30) -> dict:
+    return api_client.oracle_runs(limit)
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def oracle_sources() -> dict:
+    return api_client.oracle_sources()
+
+
+def system_checks(api_ok: bool, stats: dict | None, latest_iso: str | None) -> list[dict]:
+    """Real checks from /oracle/system; falls back to the basic checks on an older API."""
+    try:
+        info = oracle_system()
+    except api_client.ApiError:
+        return status.build_checks(api_ok, stats, latest_iso)
+    return status.build_real_checks(api_ok, info)
+
+===== dashboard\oracle\feed.py =====
+"""News Feed, YouTube Intelligence, Saved Stories and My Personalized Feed pages."""
+import streamlit as st
+
+from app.core.category import CATEGORIES
+from dashboard import account, api_client, utils
+from dashboard.oracle import components as ui
+from dashboard.oracle import data, logic
+
+DATE_RANGES = {"All time": 0, "Last 24 hours": 1, "Last 7 days": 7, "Last 30 days": 30}
+
+
+def _load_bookmarks() -> None:
+    """Keep the logged-in user's saved story ids in session state (reloaded per user)."""
+    token = st.session_state.get("token")
+    if not token:
+        return
+    user = st.session_state.get("user_email")
+    if "bookmark_ids" in st.session_state and st.session_state.get("bookmark_user") == user:
+        return
+    try:
+        st.session_state["bookmark_ids"] = set(api_client.my_bookmarks(token)["story_ids"])
+    except api_client.ApiError:
+        st.session_state["bookmark_ids"] = set()
+    st.session_state["bookmark_user"] = user
+
+
+def news_feed() -> None:
+    ui.page_header("News Feed", "Search, filter, sort and export the collected stories.")
+    _load_bookmarks()
+    limit = st.session_state.get("oracle_limit", 20)
+    c1, c2, c3 = st.columns([3, 1.3, 1.3])
+    query = c1.text_input("Search", placeholder="Search title or summary", key="nf_q")
+    priority = c2.selectbox("Priority", ["All"] + logic.PRIORITIES, key="nf_p")
+    sentiment = c3.selectbox("Sentiment", ["All"] + logic.SENTIMENTS, key="nf_s")
+    try:
+        stories = data.stories(limit, None if priority == "All" else priority)
+    except api_client.ApiError as e:
+        st.error(str(e))
+        return
+    c4, c5, c6, c7 = st.columns(4)
+    source = c4.selectbox("Source", ["All"] + logic.source_names(stories), key="nf_src")
+    category = c5.selectbox("Category", ["All"] + CATEGORIES, key="nf_cat")
+    period = c6.selectbox("Date", list(DATE_RANGES), key="nf_date")
+    sort = c7.selectbox("Sort by", ["Latest", "Priority"], key="nf_sort")
+    shown = logic.filter_stories(
+        stories, query, sentiment, source, sort, category, DATE_RANGES[period]
+    )
+    st.caption(f"Showing {len(shown)} of {len(stories)} stories")
+    if not shown:
+        ui.empty_state("No stories match", "Change the filters or run a digest from the sidebar.")
+        return
+    st.download_button("Export CSV", logic.stories_csv(shown), file_name="oracle_stories.csv",
+                       mime="text/csv", key="nf_csv")
+    for i, story in enumerate(shown, 1):
+        ui.story_card(story, i, "nf")
+
+
+def saved() -> None:
+    ui.page_header("Saved Stories", "Stories you bookmarked.")
+    token = st.session_state.get("token")
+    if not token:
+        st.info("Login from the sidebar to save and see bookmarked stories.")
+        return
+    try:
+        result = api_client.my_bookmarks(token)
+    except api_client.ApiError as e:
+        st.error(str(e))
+        return
+    st.session_state["bookmark_ids"] = set(result["story_ids"])
+    st.session_state["bookmark_user"] = st.session_state.get("user_email")
+    if not result["stories"]:
+        ui.empty_state("Nothing saved yet", "Use the Save button on a story in News Feed.")
+        return
+    st.caption(f"{result['count']} of {result['limit']} saved")
+    for i, story in enumerate(result["stories"], 1):
+        ui.story_card(story, i, "saved")
+
+
+def _video_card(v: dict, n: int) -> None:
+    with st.container(key=f"card_yt_{n}"):
+        thumb = logic.youtube_thumbnail(v.get("video_id"))
+        if thumb:
+            st.image(thumb, width=320)
+        weak = not v.get("has_transcript")
+        label = "Description only (weaker summary)" if weak else "Transcript summary"
+        st.caption(f"{v['channel']} | {label} | {utils.format_time(v.get('published'))}")
+        st.markdown("**" + utils.link_markdown(v["title"], v["link"]) + "**")
+        st.markdown(utils.md_safe(v["summary"]))
+        for point in v.get("key_points", []):
+            st.markdown("- " + utils.md_safe(point))
+        if v.get("takeaway"):
+            st.info("Takeaway: " + utils.md_safe(v["takeaway"]))
+
+
+def youtube() -> None:
+    ui.page_header("YouTube Intelligence", "AI summaries, key points and takeaways per video.")
+    limit = st.session_state.get("oracle_limit", 20)
+    try:
+        videos = data.videos(limit)
+    except api_client.ApiError as e:
+        st.error(str(e))
+        return
+    c1, c2, c3 = st.columns([3, 1.5, 1.5])
+    query = c1.text_input("Search videos", key="yt_q")
+    channels = sorted({v.get("channel", "") for v in videos if v.get("channel")})
+    channel = c2.selectbox("Channel", ["All"] + channels, key="yt_ch")
+    view = c3.selectbox("View", ["Latest", "By channel"], key="yt_view")
+    shown = logic.filter_videos(videos, query, channel)
+    if not shown:
+        ui.empty_state("No video summaries yet", "Use Run videos now in the sidebar.")
+        return
+    st.caption("Add or remove your own YouTube channels in Sources Management.")
+    n = 0
+    if view == "By channel":
+        for name in sorted({v["channel"] for v in shown}):
+            st.markdown("### " + utils.md_safe(name))
+            for v in (x for x in shown if x["channel"] == name):
+                n += 1
+                _video_card(v, n)
+    else:
+        for v in shown:
+            n += 1
+            _video_card(v, n)
+
+
+def my_feed() -> None:
+    ui.page_header("My Personalized Feed", "Stories ranked by your own interests.")
+    account.render_feed(st.session_state.get("oracle_limit", 20))
+
+===== dashboard\oracle\components.py =====
+"""Reusable ORACLE UI pieces. The *_html helpers are pure so they can be tested offline."""
+from html import escape
+
+import altair as alt
+import pandas as pd
+import streamlit as st
+
+from dashboard import api_client, utils
+from dashboard.oracle import theme
+
+
+def badge(text, color: str) -> str:
+    return f'<span class="badge" style="background:{color}">{escape(str(text))}</span>'
+
+
+def kpi_html(label, value, accent: str, sub: str = "") -> str:
+    sub_html = f'<div class="sub">{escape(str(sub))}</div>' if sub else ""
+    return (
+        f'<div class="kpi" style="--accent:{accent}">'
+        f'<div class="label">{escape(str(label))}</div>'
+        f'<div class="value">{escape(str(value))}</div>{sub_html}</div>'
+    )
+
+
+def kpi_grid(items) -> str:
+    return '<div class="kpi-grid">' + "".join(kpi_html(*i) for i in items) + "</div>"
+
+
+def status_html(label: str, value: str, state: str) -> str:
+    color = theme.STATE_COLORS.get(state, theme.STATE_COLORS["neutral"])
+    return (
+        '<div class="status">'
+        f'<div class="s-label">{escape(label)}</div>'
+        f'<div class="s-value"><span class="dot" style="--c:{color}"></span>{escape(value)}</div>'
+        "</div>"
+    )
+
+
+def status_grid_html(checks: list[dict]) -> str:
+    cells = "".join(status_html(c["label"], c["value"], c["state"]) for c in checks)
+    return f'<div class="status-grid">{cells}</div>'
+
+
+def empty_html(title: str, hint: str = "") -> str:
+    return f'<div class="empty"><b>{escape(title)}</b>{escape(hint)}</div>'
+
+
+def claim_flag(story: dict) -> bool:
+    return any(c.get("status") == "disputed" for c in story.get("claims") or [])
+
+
+def story_badges_html(story: dict) -> str:
+    medium = theme.PRIORITY_COLORS["Medium"]
+    parts = [
+        badge(story.get("priority", "Medium"),
+              theme.PRIORITY_COLORS.get(story.get("priority"), medium)),
+        badge(story.get("sentiment", "neutral"),
+              theme.SENTIMENT_COLORS.get(story.get("sentiment"), theme.SENTIMENT_COLORS["neutral"])),
+        badge(story.get("credibility", "Single source"), "#334155"),
+    ]
+    if story.get("category"):
+        parts.append(badge(story["category"], "#0E7490"))
+    if claim_flag(story):
+        parts.append(badge("Details differ", theme.PRIORITY_COLORS["High"]))
+    for k in story.get("matched_interests") or []:
+        parts.append(badge("match: " + k, "#6D28D9"))
+    return " ".join(parts)
+
+
+def story_row_html(story: dict) -> str:
+    color = theme.PRIORITY_COLORS.get(story.get("priority"), theme.PRIORITY_COLORS["Medium"])
+    return (
+        '<div class="row-item">'
+        f'{badge(story.get("priority", "Medium"), color)}'
+        f'<span class="row-title">{utils.html_safe(story.get("title", ""))}</span>'
+        f'<span class="row-time">{escape(utils.format_time(story.get("created_at")))}</span>'
+        "</div>"
+    )
+
+
+def page_header(title: str, subtitle: str = "") -> None:
+    st.markdown(
+        f'<div class="page-title">{escape(title)}</div>'
+        f'<div class="page-sub">{escape(subtitle)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def empty_state(title: str, hint: str = "") -> None:
+    st.markdown(empty_html(title, hint), unsafe_allow_html=True)
+
+
+def _thumbnail(story: dict) -> None:
+    url = str(story.get("image_url") or "")
+    if url.startswith(("http://", "https://")):
+        st.image(url, width=280)
+
+
+def _bookmark_button(story: dict, key: str, index: int) -> None:
+    token = st.session_state.get("token")
+    sid = story.get("id")
+    if not token or sid is None:
+        return
+    saved = sid in st.session_state.get("bookmark_ids", set())
+    if st.button("★ Saved" if saved else "☆ Save", key=f"bm_{key}_{index}"):
+        try:
+            if saved:
+                api_client.remove_bookmark(token, sid)
+            else:
+                api_client.add_bookmark(token, sid)
+        except api_client.ApiError as e:
+            st.warning(str(e))
+            return
+        ids = set(st.session_state.get("bookmark_ids", set()))
+        ids.symmetric_difference_update({sid})
+        st.session_state["bookmark_ids"] = ids
+        st.rerun()
+
+
+def story_card(story: dict, index: int, key: str) -> None:
+    with st.container(key=f"card_{key}_{index}"):
+        _thumbnail(story)
+        st.markdown(story_badges_html(story), unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="story-title">{index}. {utils.html_safe(story.get("title", ""))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(utils.md_safe(story.get("summary", "")))
+        if story.get("claims"):
+            st.markdown(utils.claims_markdown(story["claims"]))
+        sources = story.get("sources") or []
+        st.caption(
+            f"{utils.format_time(story.get('created_at'))} | Sources: "
+            + utils.sources_markdown(sources)
+        )
+        link = next(
+            (s["link"] for s in sources if str(s.get("link", "")).startswith(("http://", "https://"))),
+            None,
+        )
+        if link:
+            st.link_button("Read full story", link, key=f"read_{key}_{index}")
+        _bookmark_button(story, key, index)
+
+
+def render_sources(sources) -> None:
+    if not sources:
+        return
+    with st.expander("Sources"):
+        for s in sources:
+            links = utils.sources_markdown(s.get("sources", []))
+            st.markdown(f"**[{s['n']}]** {utils.md_safe(s['title'])}  \n{links}")
+
+
+def bar_chart(rows, category: str, value: str, colors: dict | None = None,
+              height: int = 260, horizontal: bool = False):
+    df = pd.DataFrame(rows)
+    if colors:
+        color = alt.Color(
+            f"{category}:N",
+            scale=alt.Scale(domain=list(colors), range=list(colors.values())),
+            legend=None,
+        )
+    else:
+        color = alt.value(theme.PRIMARY)
+    if horizontal:
+        x, y = alt.X(f"{value}:Q", title=None), alt.Y(f"{category}:N", sort="-x", title=None)
+    else:
+        x, y = alt.X(f"{category}:N", sort=None, title=None), alt.Y(f"{value}:Q", title=None)
+    return (
+        alt.Chart(df)
+        .mark_bar(cornerRadiusEnd=4)
+        .encode(x=x, y=y, color=color, tooltip=[category, value])
+        .properties(height=height)
+        .configure(background="transparent")
+        .configure_axis(labelColor=theme.MUTED, titleColor=theme.MUTED,
+                        gridColor=theme.BORDER, domainColor=theme.BORDER)
+        .configure_view(strokeWidth=0)
+    )
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\auth.py =====
+"""Account endpoints: register, login, current user, per-user interests."""
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+
+from app.core import ratelimit, user_sources, users
+from app.core.ratelimit import client_ip
+from app.core.config import settings
+from app.core.personalize import hide_foreign_custom, personalize_stories
+from app.core.storage import get_recent_stories
+from app.core.tokens import create_token, verify_token
+
+router = APIRouter(tags=["accounts"])
+
+
+class Credentials(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class UserInterests(BaseModel):
+    interests: str = Field(default="", max_length=1000)
+
+
+def _secret() -> str:
+    if not settings.auth_secret:
+        raise HTTPException(status_code=503, detail="Accounts band hain: AUTH_SECRET set nahi hai")
+    return settings.auth_secret
+
+
+def _throttle(request: Request, email: str | None = None) -> None:
+    """Bruteforce rokne ke liye: IP aur (login par) email, dono par limit."""
+    limit, window = settings.auth_rate_limit, settings.auth_rate_window_seconds
+    keys = [f"auth-ip:{client_ip(request, settings.trust_proxy_headers)}"]
+    if email:
+        keys.append(f"auth-email:{email[:254]}")
+    for key in keys:
+        wait = ratelimit.hit(key, limit, window)
+        if wait:
+            raise HTTPException(
+                status_code=429,
+                detail="Bohat zyada koshishein. Thori der baad dobara try karein",
+                headers={"Retry-After": str(int(wait) + 1)},
+            )
+
+
+def _issue(user: dict) -> dict:
+    token = create_token(user["id"], _secret(), settings.auth_token_hours * 3600)
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+def get_current_user(authorization: str | None = Header(default=None)) -> dict:
+    secret = _secret()
+    scheme, _, token = (authorization or "").partition(" ")
+    user_id = verify_token(token.strip(), secret) if scheme.lower() == "bearer" else None
+    user = users.get_user(user_id) if user_id is not None else None
+    if user is None:
+        raise HTTPException(status_code=401, detail="Login chahiye ya token expire ho gaya")
+    return user
+
+
+@router.post("/auth/register", status_code=201)
+def register(req: Credentials, request: Request):
+    _secret()
+    _throttle(request)
+    email = users.normalize_email(req.email)
+    if not users.is_valid_email(email):
+        raise HTTPException(status_code=400, detail="Email sahi nahi hai")
+    try:
+        user = users.create_user(email, req.password)
+    except users.UserExistsError:
+        raise HTTPException(status_code=409, detail="Ye email pehle se registered hai")
+    return _issue(user)
+
+
+@router.post("/auth/login")
+def login(req: Credentials, request: Request):
+    _secret()
+    _throttle(request, users.normalize_email(req.email))
+    user = users.authenticate(req.email, req.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Email ya password ghalat hai")
+    return _issue(user)
+
+
+@router.get("/me")
+def me(user: dict = Depends(get_current_user)):
+    return user
+
+
+@router.put("/me/interests")
+def update_my_interests(req: UserInterests, user: dict = Depends(get_current_user)):
+    saved = users.set_user_interests(user["id"], req.interests)
+    return {"interests": saved or []}
+
+
+@router.get("/me/feed")
+def my_feed(
+    limit: int = Query(20, ge=1, le=100),
+    scope: str = Query("all", pattern="^(all|mine)$"),
+    user: dict = Depends(get_current_user),
+):
+    """Recent stories re-ranked for this user's interests.
+
+    scope=mine hides stories that come only from other users' custom sources.
+    """
+    stories = get_recent_stories(limit=100)
+    if scope == "mine":
+        stories = hide_foreign_custom(stories, user_sources.own_source_labels(user["id"]))
+    ranked = personalize_stories(stories, user["interests"])[:limit]
+    return {"interests": user["interests"], "scope": scope, "count": len(ranked), "stories": ranked}
+
+
+class Delivery(BaseModel):
+    digest_enabled: bool | None = None
+    telegram_chat_id: str | None = Field(default=None, max_length=64)
+    digest_hour: int | None = Field(default=None, ge=0, le=23)
+
+
+def _delivery_payload(user: dict) -> dict:
+    return {"email": user["email"], **users.get_delivery_settings(user["id"])}
+
+
+@router.get("/me/delivery")
+def my_delivery(user: dict = Depends(get_current_user)):
+    return _delivery_payload(user)
+
+
+@router.put("/me/delivery")
+def update_my_delivery(req: Delivery, user: dict = Depends(get_current_user)):
+    """Sirf wahi fields badalti hain jo bheji gayi hon. digest_hour null = main digest ke saath."""
+    sent = req.model_fields_set
+    changes = {}
+    if "digest_enabled" in sent and req.digest_enabled is not None:
+        changes["digest_enabled"] = req.digest_enabled
+    if "telegram_chat_id" in sent:
+        changes["telegram_chat_id"] = req.telegram_chat_id or ""
+    if "digest_hour" in sent:
+        changes["digest_hour"] = req.digest_hour
+    try:
+        saved = users.update_delivery_settings(user["id"], **changes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if saved is None:
+        raise HTTPException(status_code=404, detail="User nahi mila")
+    return _delivery_payload(user)
+
+
+class SourceIn(BaseModel):
+    kind: str = Field(pattern="^(rss|youtube)$")
+    url: str = Field(min_length=3, max_length=500)
+    name: str = Field(default="", max_length=60)
+
+
+@router.get("/me/sources")
+def my_sources(user: dict = Depends(get_current_user)):
+    return {"limit": user_sources.MAX_PER_USER, "sources": user_sources.list_sources(user["id"])}
+
+
+@router.post("/me/sources", status_code=201)
+def add_my_source(req: SourceIn, user: dict = Depends(get_current_user)):
+    wait = ratelimit.hit(f"sources:{user['id']}", 30, 3600)
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail="Bohat zyada koshishein. Thori der baad dobara try karein",
+            headers={"Retry-After": str(int(wait) + 1)},
+        )
+    try:
+        return user_sources.add_source(user["id"], req.kind, req.url, req.name)
+    except user_sources.SourceExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except user_sources.SourceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/me/sources/{source_id}")
+def delete_my_source(source_id: int, user: dict = Depends(get_current_user)):
+    if not user_sources.delete_source(user["id"], source_id):
+        raise HTTPException(status_code=404, detail="Source nahi mili")
+    return {"deleted": source_id}
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\bookmarks.py =====
+"""Bookmark endpoints (login required, same bearer token as the other /me routes)."""
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.auth import get_current_user
+from app.core import bookmarks
+
+router = APIRouter(tags=["bookmarks"])
+
+
+@router.get("/me/bookmarks")
+def list_my_bookmarks(user: dict = Depends(get_current_user)):
+    stories = bookmarks.list_bookmarked_stories(user["id"])
+    return {
+        "count": len(stories),
+        "limit": bookmarks.MAX_PER_USER,
+        "story_ids": [s["id"] for s in stories],
+        "stories": stories,
+    }
+
+
+@router.put("/me/bookmarks/{story_id}")
+def save_bookmark(story_id: int, user: dict = Depends(get_current_user)):
+    try:
+        created = bookmarks.add_bookmark(user["id"], story_id)
+    except bookmarks.StoryNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except bookmarks.BookmarkLimitError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"story_id": story_id, "saved": True, "created": created}
+
+
+@router.delete("/me/bookmarks/{story_id}")
+def delete_bookmark(story_id: int, user: dict = Depends(get_current_user)):
+    if not bookmarks.remove_bookmark(user["id"], story_id):
+        raise HTTPException(status_code=404, detail="Bookmark nahi mila")
+    return {"story_id": story_id, "saved": False}
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\demo.py =====
+"""Read-only demo mode: DEMO_MODE=true par data badalne wale requests band.
+
+Sirf GET aur do read-only POST (/chat, /research) chalte hain.
+"""
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from app.core.config import settings
+
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+ALLOWED_POSTS = {"/chat", "/research", "/research/web"}
+
+
+def is_blocked(method: str, path: str) -> bool:
+    if method.upper() in SAFE_METHODS:
+        return False
+    return not (method.upper() == "POST" and path.rstrip("/") in ALLOWED_POSTS)
+
+
+def add_demo_guard(app: FastAPI) -> None:
+    @app.middleware("http")
+    async def demo_guard(request: Request, call_next):
+        if settings.demo_mode and is_blocked(request.method, request.url.path):
+            return JSONResponse(
+                {"detail": "Demo mode: ye instance sirf padhne ke liye hai"}, status_code=403
+            )
+        return await call_next(request)
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\middleware.py =====
+"""Request id, access log aur basic security headers."""
+import logging
+import re
+import time
+import uuid
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from app.core import error_alerts
+from app.core.logging_setup import request_id_var
+
+log = logging.getLogger("app.http")
+_ID_RE = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+}
+
+
+def add_http_middleware(app: FastAPI) -> None:
+    @app.middleware("http")
+    async def request_wrapper(request: Request, call_next):
+        incoming = request.headers.get("x-request-id", "")
+        request_id = incoming if _ID_RE.match(incoming) else uuid.uuid4().hex
+        token = request_id_var.set(request_id)
+        start = time.perf_counter()
+        fields = {"method": request.method, "path": request.url.path}
+        try:
+            try:
+                response = await call_next(request)
+            except Exception as exc:
+                log.exception("unhandled error", extra={"fields": fields})
+                error_alerts.report(
+                    f"Server error 500: {request.method} {request.url.path}",
+                    f"request_id={request_id} error={type(exc).__name__}",
+                )
+                response = JSONResponse(
+                    {"detail": "Server me masla aaya", "request_id": request_id}, status_code=500
+                )
+            fields["status"] = response.status_code
+            fields["duration_ms"] = round((time.perf_counter() - start) * 1000, 1)
+            level = logging.DEBUG if request.url.path == "/health" else logging.INFO
+            log.log(level, "request", extra={"fields": fields})
+            response.headers["X-Request-ID"] = request_id
+            for name, value in SECURITY_HEADERS.items():
+                response.headers.setdefault(name, value)
+            return response
+        finally:
+            request_id_var.reset(token)
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\oracle.py =====
+"""Read-only ORACLE endpoints: analytics, system status, alert history, run history, sources."""
+from fastapi import APIRouter, Query
+
+from app.core import oracle_stats
+
+router = APIRouter(prefix="/oracle", tags=["oracle"])
+
+
+@router.get("/analytics")
+def analytics(days: int = Query(30, ge=1, le=365)):
+    return oracle_stats.analytics(days)
+
+
+@router.get("/system")
+def system():
+    return oracle_stats.system_status()
+
+
+@router.get("/alerts")
+def alerts(limit: int = Query(50, ge=1, le=200)):
+    return oracle_stats.alert_history(limit)
+
+
+@router.get("/runs")
+def runs(limit: int = Query(30, ge=1, le=200)):
+    items = oracle_stats.recent_runs(limit)
+    return {"count": len(items), "runs": items}
+
+
+@router.get("/sources")
+def sources():
+    return oracle_stats.source_status()
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\related.py =====
+"""Related articles and videos endpoint (read-only, no LLM call, so no Gemini quota)."""
+from fastapi import APIRouter, Query
+
+from app.agents.related import related_content
+
+router = APIRouter(tags=["related"])
+
+
+@router.get("/related")
+def related(q: str = Query(..., min_length=2, max_length=300)):
+    return related_content(q)
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\routes.py =====
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from app.agents.deep_research import run_research
+from app.agents.research_web import add_web_sources
+from app.agents.research import ResearchError, answer_question
+from app.core.storage import (
+    get_recent_articles,
+    get_recent_stories,
+    get_recent_videos,
+    get_stats,
+)
+from app.core.interests import get_interests, save_interests
+from app.core.maintenance import cleanup_old_data
+from app.core.story import PRIORITIES
+from app.scheduler import (
+    is_busy,
+    run_alerts,
+    run_digest,
+    run_user_digests,
+    run_videos,
+    run_weekly,
+    safe_run,
+)
+from app.weekly import build_weekly_report
+
+router = APIRouter()
+
+
+class ChatRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+
+
+@router.get("/stories")
+def list_stories(
+    limit: int = Query(20, ge=1, le=100),
+    priority: str | None = None,
+    hours: int | None = Query(None, ge=1, le=24 * 365),
+):
+    if priority is not None:
+        priority = priority.strip().capitalize()
+        if priority not in PRIORITIES:
+            raise HTTPException(
+                status_code=400, detail=f"priority in me se ho: {', '.join(PRIORITIES)}"
+            )
+    stories = get_recent_stories(limit=limit, priority=priority, hours=hours)
+    return {"count": len(stories), "stories": stories}
+
+
+@router.get("/articles")
+def list_articles(limit: int = Query(50, ge=1, le=200)):
+    articles = get_recent_articles(limit=limit)
+    return {"count": len(articles), "articles": articles}
+
+
+@router.get("/stats")
+def stats():
+    return get_stats()
+
+
+@router.get("/videos")
+def list_videos(limit: int = Query(10, ge=1, le=50)):
+    videos = get_recent_videos(limit=limit)
+    return {"count": len(videos), "videos": videos}
+
+
+@router.post("/chat")
+def chat(req: ChatRequest):
+    """Collected khabron se sawal ka jawab (sources ke saath)."""
+    question = req.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Sawal khali nahi ho sakta")
+    try:
+        return answer_question(question)
+    except ValueError as e:  # GEMINI_API_KEY set nahi
+        raise HTTPException(status_code=503, detail=str(e))
+    except ResearchError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+def _start(job, name: str, background_tasks: BackgroundTasks) -> dict:
+    if is_busy():
+        raise HTTPException(
+            status_code=409, detail="Dusra job abhi chal raha hai, thori der baad try karein"
+        )
+    background_tasks.add_task(safe_run, job, name)
+    return {"status": "started", "job": name}
+
+
+@router.post("/run-digest")
+def trigger_digest(background_tasks: BackgroundTasks):
+    """Digest background me chalata hai (naye articles hon to email bhi jati hai)."""
+    return _start(run_digest, "Digest", background_tasks)
+
+
+@router.post("/run-alerts")
+def trigger_alerts(background_tasks: BackgroundTasks):
+    """Breaking alert check background me chalata hai."""
+    return _start(run_alerts, "Alert check", background_tasks)
+
+
+@router.post("/run-videos")
+def trigger_videos(background_tasks: BackgroundTasks):
+    """YouTube videos ki summaries background me banata hai."""
+    return _start(run_videos, "Videos", background_tasks)
+
+
+@router.get("/weekly")
+def weekly(overview: bool = False):
+    """Weekly report (JSON). overview=true par Gemini se khulasa bhi banta hai."""
+    return build_weekly_report(overview=overview)
+
+
+@router.post("/run-weekly")
+def trigger_weekly(background_tasks: BackgroundTasks):
+    """Weekly report banakar email karta hai (background me)."""
+    return _start(run_weekly, "Weekly report", background_tasks)
+
+
+class InterestsRequest(BaseModel):
+    interests: str = Field(default="", max_length=1000)
+
+
+@router.get("/interests")
+def read_interests():
+    """Personalization keywords jo ranking me use hoti hain."""
+    return {"interests": get_interests()}
+
+
+@router.put("/interests")
+def update_interests(req: InterestsRequest):
+    """Keywords save karta hai (comma se alag). Khali bhejne par personalization band."""
+    return {"interests": save_interests(req.interests)}
+
+
+class ResearchRequest(BaseModel):
+    topic: str = Field(min_length=3, max_length=300)
+
+
+@router.post("/research")
+def research(req: ResearchRequest):
+    """Topic par multi-step report (collected khabron se, sources ke saath)."""
+    topic = req.topic.strip()
+    if len(topic) < 3:
+        raise HTTPException(status_code=400, detail="Topic bohat chhota hai")
+    try:
+        return add_web_sources(run_research(topic), topic)
+    except ValueError as e:  # GEMINI_API_KEY set nahi
+        raise HTTPException(status_code=503, detail=str(e))
+    except ResearchError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/run-cleanup")
+def trigger_cleanup(background_tasks: BackgroundTasks):
+    """Purana data (retention) background me saaf karta hai."""
+    return _start(cleanup_old_data, "Cleanup", background_tasks)
+
+
+@router.post("/run-user-digests")
+def trigger_user_digests(background_tasks: BackgroundTasks):
+    """Opted-in users ko unke apne waqt ki digest background me bhejta hai."""
+    return _start(run_user_digests, "User digests", background_tasks)
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\security.py =====
+import hmac
+
+from fastapi import Header, HTTPException
+
+from app.core.config import settings
+
+
+def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
+    """API_KEY set ho to har request me X-API-Key header chahiye. Khali ho to koi rok nahi."""
+    expected = settings.api_key
+    if not expected:
+        return
+    if not x_api_key or not hmac.compare_digest(x_api_key.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="API key missing ya ghalat hai")
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\web_routes.py =====
+"""Web-source check endpoint (Gemini Google Search grounding)."""
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
+
+from app.agents.research import ResearchError
+from app.agents.web_check import web_check
+from app.core import ratelimit
+from app.core.config import settings
+from app.core.ratelimit import client_ip
+
+router = APIRouter()
+
+
+class WebCheckRequest(BaseModel):
+    text: str = Field(min_length=3, max_length=500)
+
+
+@router.post("/research/web")
+def research_web(req: WebCheckRequest, request: Request):
+    """Claim ya topic ko web sources se check karta hai (links ke saath)."""
+    text = req.text.strip()
+    if len(text) < 3:
+        raise HTTPException(status_code=400, detail="Text bohat chhota hai")
+    wait = ratelimit.hit(f"webcheck:{client_ip(request, settings.trust_proxy_headers)}", 20, 3600)
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail="Bohat zyada koshishein. Thori der baad dobara try karein",
+            headers={"Retry-After": str(int(wait) + 1)},
+        )
+    try:
+        return web_check(text)
+    except ValueError as e:  # GEMINI_API_KEY set nahi
+        raise HTTPException(status_code=503, detail=str(e))
+    except ResearchError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+===== E:\News_Sumrizer\ai-briefing-agent\app\api\__init__.py =====
