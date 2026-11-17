@@ -14,7 +14,7 @@ from app.core.database import SessionLocal, init_db
 from app.core.models import AlertDB, ArticleDB, PipelineRunDB, StoryDB, VideoDB
 from app.core.story import PRIORITIES, SENTIMENTS
 from app.core.telegram_notifier import TelegramNotifier
-from app.core import source_health
+from app.core import api_keys, source_health
 from app.core.user_sources import _build, _rows
 
 _WORD = re.compile(r"[a-z][a-z'-]{3,}")
@@ -43,7 +43,7 @@ def _configured() -> dict:
     except Exception:
         telegram = False
     return {
-        "ai": bool(settings.gemini_api_key),
+        "ai": bool(settings.gemini_api_key) or bool(api_keys.load_db_keys()),
         "email": bool(
             (settings.email_sender and settings.email_password) or settings.resend_api_key
         ),

@@ -12,7 +12,7 @@ except ModuleNotFoundError:  # "streamlit run" me project root path me nahi hota
     from dashboard import api_client
 
 from app.core.config import settings
-from dashboard.oracle import feed, misc, overview, report, research, sidebar, theme
+from dashboard.oracle import feed, keys, misc, overview, report, research, sidebar, theme
 
 st.set_page_config(page_title="ORACLE", page_icon="🔮", layout="wide",
                    initial_sidebar_state="expanded")
@@ -55,6 +55,7 @@ PAGES = [
     ("Alerts & Notifications", "notifications_active", "alerts", misc.alerts),
     ("Sources Management", "rss_feed", "sources", misc.sources),
     ("Delivery Settings", "mail", "delivery", misc.delivery),
+    ("API Keys", "key", "api-keys", keys.render),
     ("System Monitoring", "monitor_heart", "system", misc.system),
     ("Account & Profile", "account_circle", "account", misc.account_page),
 ]

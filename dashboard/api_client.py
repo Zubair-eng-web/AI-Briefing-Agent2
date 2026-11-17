@@ -236,3 +236,15 @@ def mark_read(token: str, story_id: int) -> dict:
 
 def mark_unread(token: str, story_id: int) -> dict:
     return _request("DELETE", f"/me/reads/{story_id}", extra_headers=_bearer(token))
+
+
+def oracle_keys() -> dict:
+    return _request("GET", "/oracle/keys")
+
+
+def add_api_key(key: str) -> dict:
+    return _request("POST", "/oracle/keys", json={"key": key})
+
+
+def remove_api_key(key_id: int) -> dict:
+    return _request("DELETE", f"/oracle/keys/{key_id}")

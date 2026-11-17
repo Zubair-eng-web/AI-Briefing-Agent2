@@ -12,11 +12,18 @@ SYSTEM_PROMPT = (
 )
 
 
-def get_client() -> genai.Client:
-    key = settings.gemini_api_key
-    if not key:
-        raise ValueError("GEMINI_API_KEY .env file me set nahi hai")
-    return genai.Client(api_key=key)
+def get_client():
+    """One key: a plain genai.Client. Several keys: a client that switches key on quota errors."""
+    from app.core import api_keys
+
+    keys = api_keys.candidate_keys()
+    if not keys:
+        raise ValueError(
+            "GEMINI_API_KEY .env file me set nahi hai (ya dashboard ke API Keys page se key add karein)"
+        )
+    if len(keys) == 1:
+        return genai.Client(api_key=keys[0])
+    return api_keys.RotatingClient(keys, genai.Client)
 
 
 def summarize_article(article: Article, client=None) -> str:

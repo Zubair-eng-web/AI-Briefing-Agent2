@@ -48,3 +48,16 @@ def _no_source_health_writes(monkeypatch):
 
     monkeypatch.setattr(sh, "SessionLocal", _blocked)
     monkeypatch.setattr(sh, "init_db", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _no_api_key_db(monkeypatch):
+    """get_client must not read the real database during tests."""
+    import app.core.api_keys as ak
+
+    def _blocked():
+        raise RuntimeError("real database blocked in tests")
+
+    monkeypatch.setattr(ak, "SessionLocal", _blocked)
+    monkeypatch.setattr(ak, "init_db", lambda: None)
+    ak._exhausted.clear()

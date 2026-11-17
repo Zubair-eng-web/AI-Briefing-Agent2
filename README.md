@@ -92,7 +92,7 @@ Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, 
 
 `GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`, `/run-cleanup`, `/run-user-digests`, `/research/web`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
 
-Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (digest on/off, Telegram chat id, digest hour), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`. Bookmarks: `GET /me/bookmarks`, `PUT` and `DELETE /me/bookmarks/{story_id}`. Read status: `GET /me/reads`, `PUT` and `DELETE /me/reads/{story_id}`. Read-only helpers: `GET /related?q=`, `GET /oracle/analytics`, `/oracle/system`, `/oracle/alerts`, `/oracle/runs`, `/oracle/sources`.
+Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (digest on/off, Telegram chat id, digest hour), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`. Bookmarks: `GET /me/bookmarks`, `PUT` and `DELETE /me/bookmarks/{story_id}`. Read status: `GET /me/reads`, `PUT` and `DELETE /me/reads/{story_id}`. API keys: `GET`, `POST` and `DELETE /oracle/keys` (need `API_KEY`). Read-only helpers: `GET /related?q=`, `GET /oracle/analytics`, `/oracle/system`, `/oracle/alerts`, `/oracle/runs`, `/oracle/sources`.
 
 ## Demo mode
 
@@ -153,7 +153,7 @@ dashboard/oracle/  ORACLE dashboard (theme, components, pages); entry point orac
 scripts/       setup.ps1, setup.sh, sync_env_example.py, dedupe_stories.py
 tests/         automated tests (all external services are faked)
 evals/         labelled dataset and quality evaluation
-migrations/    Alembic migration scripts (0001 baseline, 0002 user sources, 0003 story claims, 0004 user delivery, 0005 image_url, 0006 bookmarks, 0007 pipeline runs, 0008 story reads, 0009 source health)
+migrations/    Alembic migration scripts (0001 baseline, 0002 user sources, 0003 story claims, 0004 user delivery, 0005 image_url, 0006 bookmarks, 0007 pipeline runs, 0008 story reads, 0009 source health, 0010 api keys)
 .github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
 render.yaml
 ```
@@ -228,7 +228,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | 0.1 | One-command setup (done) | `scripts/setup.ps1` and `scripts/setup.sh` prepare a fresh clone without Docker |
 | 0.2 | Offline tests and CI (done) | The whole suite runs without internet; GitHub Actions runs lint, tests and a coverage gate on every push |
 | 0.3 | Config in sync (done) | `scripts/sync_env_example.py` keeps `.env.example` in step with the settings and a test guards it |
-| 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0009`), so existing databases get new columns |
+| 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0010`), so existing databases get new columns |
 
 **Phase 1: Multi-user foundation (exit: two users see different feeds)**
 
@@ -338,6 +338,7 @@ All numbers come from the real API. Parts that are not monitored yet are labelle
 | 90 | Source errors in the dashboard | Sources Management shows Last checked and Last error per source and warns when a collection failed |
 | 91 | Story sharing | Share box on every story card: text to copy (title, short summary, first safe link) and an email link |
 | 92 | Final checks | 600 offline tests pass, ruff is clean, README synced with the code; screenshots were skipped by choice |
+| 93 | API key rotation | `api_keys` table (migration `0010`); the API Keys page adds or removes extra Gemini keys (shown only as the last 4 characters, needs `API_KEY`); on a 429 quota error the client switches to the next key and the used-up key rests for 30 minutes |
 
 ### Planned next
 

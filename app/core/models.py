@@ -185,3 +185,14 @@ class SourceHealthDB(Base):
     last_ok_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_items: Mapped[int] = mapped_column(default=0)
     last_error: Mapped[str] = mapped_column(String(300), default="")
+
+
+class ApiKeyDB(Base):
+    """Extra Gemini API keys added from the dashboard."""
+
+    __tablename__ = "api_keys"
+    __table_args__ = (UniqueConstraint("key", name="uq_api_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
