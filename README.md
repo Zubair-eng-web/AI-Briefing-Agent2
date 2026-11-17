@@ -98,6 +98,10 @@ Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `P
 
 Set `DEMO_MODE=true` on a separate instance to make it read-only: every request that changes data (digests, accounts, settings, sources) answers 403, while reading, `/chat` and `/research` keep working. Use it for a public demo.
 
+## Live demo
+
+A read-only demo is described in `docs/DEMO_DEPLOY.md`. After deploying it, check it with `python -m scripts.smoke_demo <url>`.
+
 ## Deployment
 
 The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.yml`) wakes the service and calls `/run-digest`, `/run-alerts` and `/run-weekly` on a schedule. Secrets (`API_URL`, `API_KEY`) live in the repository's Actions secrets.
@@ -205,6 +209,7 @@ render.yaml
 | 61 | Client IP forwarding | The dashboard forwards each visitor's IP in `X-Forwarded-For` so login rate limits count real users, not the dashboard's single IP; nothing is sent when the IP is unknown |
 | 62 | README Phase 0 table | Phase 0 items 0.1 to 0.3 (one-command setup, offline tests and CI, config sync) are listed again next to 0.4 |
 | 63 | Web sources in research report | `RESEARCH_WEB=true` adds the Google Search grounded answer and real links to `POST /research` (`web` field) and to the dashboard Research tab; needs a billed Gemini key, off by default; any quota or network error leaves the normal report untouched |
+| 64 | Demo deploy kit | `scripts/smoke_demo.py` checks a deployed demo (health, docs, writes blocked), `docs/DEMO_DEPLOY.md` explains the Render deploy and the screenshots, `docs/screenshots/` is ready |
 
 ### Product roadmap
 
