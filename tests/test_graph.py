@@ -48,7 +48,7 @@ def test_full_run_in_correct_order():
     result = graph.invoke({"trace": []})
 
     order = [line.split(":")[0] for line in result["trace"]]
-    assert order == ["collect", "summarize", "analyze", "factcheck", "rank", "email"]
+    assert order == ["collect", "summarize", "analyze", "factcheck", "claims", "rank", "email"]
     assert result["sent"] is True
     assert len(sent) == 1
 

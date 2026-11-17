@@ -143,7 +143,7 @@ def test_graph_critical_story_triggers_alert_before_email():
     )
     result = graph.invoke({"trace": []})
     order = [line.split(":")[0] for line in result["trace"]]
-    assert order == ["collect", "summarize", "analyze", "factcheck", "rank", "alert", "email"]
+    assert order == ["collect", "summarize", "analyze", "factcheck", "claims", "rank", "alert", "email"]
     assert len(alerts) == 1 and len(alerts[0]) == 2
     assert len(marked) == 1
     assert len(digests) == 1
