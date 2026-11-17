@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     resend_from: str = "AI Briefing <onboarding@resend.dev>"
 
+    auth_rate_limit: int = 10
+    auth_rate_window_seconds: int = 300
+    trust_proxy_headers: bool = False
+    log_level: str = "INFO"
+    log_json: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

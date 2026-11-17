@@ -1,8 +1,9 @@
 """Account endpoints: register, login, current user, per-user interests."""
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app.core import users
+from app.core import ratelimit, users
+from app.core.ratelimit import client_ip
 from app.core.config import settings
 from app.core.personalize import personalize_stories
 from app.core.storage import get_recent_stories
@@ -26,6 +27,22 @@ def _secret() -> str:
     return settings.auth_secret
 
 
+def _throttle(request: Request, email: str | None = None) -> None:
+    """Bruteforce rokne ke liye: IP aur (login par) email, dono par limit."""
+    limit, window = settings.auth_rate_limit, settings.auth_rate_window_seconds
+    keys = [f"auth-ip:{client_ip(request, settings.trust_proxy_headers)}"]
+    if email:
+        keys.append(f"auth-email:{email[:254]}")
+    for key in keys:
+        wait = ratelimit.hit(key, limit, window)
+        if wait:
+            raise HTTPException(
+                status_code=429,
+                detail="Bohat zyada koshishein. Thori der baad dobara try karein",
+                headers={"Retry-After": str(int(wait) + 1)},
+            )
+
+
 def _issue(user: dict) -> dict:
     token = create_token(user["id"], _secret(), settings.auth_token_hours * 3600)
     return {"access_token": token, "token_type": "bearer", "user": user}
@@ -42,8 +59,9 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict:
 
 
 @router.post("/auth/register", status_code=201)
-def register(req: Credentials):
+def register(req: Credentials, request: Request):
     _secret()
+    _throttle(request)
     email = users.normalize_email(req.email)
     if not users.is_valid_email(email):
         raise HTTPException(status_code=400, detail="Email sahi nahi hai")
@@ -55,8 +73,9 @@ def register(req: Credentials):
 
 
 @router.post("/auth/login")
-def login(req: Credentials):
+def login(req: Credentials, request: Request):
     _secret()
+    _throttle(request, users.normalize_email(req.email))
     user = users.authenticate(req.email, req.password)
     if user is None:
         raise HTTPException(status_code=401, detail="Email ya password ghalat hai")

@@ -26,3 +26,13 @@ def _no_real_telegram(monkeypatch):
         raise RuntimeError("real Telegram call blocked in tests")
 
     monkeypatch.setattr(tn, "_default_post", _blocked)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Har test saaf rate-limit hisaab se shuru ho."""
+    from app.core.ratelimit import reset_all
+
+    reset_all()
+    yield
+    reset_all()
