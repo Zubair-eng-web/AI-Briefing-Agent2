@@ -103,6 +103,7 @@ The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.
 ```bash
 python -m evals.run_eval              # dedup precision / recall / F1 (offline)
 python -m evals.run_eval --priority   # priority accuracy (calls Gemini)
+python -m evals.run_eval --claims     # does the claim check catch contradicting outlets (calls Gemini)
 ```
 
 The labelled set lives in `evals/dataset.json`. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
@@ -181,6 +182,8 @@ render.yaml, docker-compose.yml, Dockerfile
 | 39 | Evaluation set | `evals/` holds a labelled dataset and `python -m evals.run_eval` reports dedup precision/recall/F1 and (with `--priority`) priority accuracy, so prompt and ranking changes can be measured |
 | 40 | License and contributing guide | MIT `LICENSE` and `CONTRIBUTING.md` |
 | 41 | Dedup tuning | A title+summary overlap rule merges the same story told with different words; on the 8-case evaluation set dedup scores precision 1.0 and recall 1.0 (the set is small, see Evaluation) |
+| 42 | Per-claim support | One extra LLM call extracts up to 3 key claims for multi-outlet stories and marks each as confirmed, disputed or single source by outlet; shown in the digest email |
+| 43 | Claim check wired into the daily graph | The `claims` step now runs in the briefing graph; before this the claim check only ran in the standalone pipeline |
 
 ### Product roadmap
 
@@ -206,7 +209,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 2.1 | Per-claim fact-checking | Claims are extracted and verified against outside sources |
+| 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets and shown in the email; saving them in the database, showing them in the API and dashboard, and verifying against outside sources are still open |
 | 2.2 | Deeper research agent | Web sources and follow-up searches are added to the report |
 | 2.3 | Evaluation set (dedup and priority done) | Answer-quality evaluation and a larger dataset are still open |
 

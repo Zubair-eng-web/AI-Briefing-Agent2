@@ -106,12 +106,44 @@ def evaluate_priority(dataset: dict, analyzer=None) -> dict:
     }
 
 
+def evaluate_claims(dataset: dict, checker=None) -> dict:
+    """Story-level: kya contradictory outlets wali stories 'disputed' pakdi gayin?"""
+    from app.core.story import Story
+
+    cases = dataset["claims"]
+    stories = [
+        Story(title=c["title"], summary="", sources=[], evidence=[tuple(e) for e in c["evidence"]])
+        for c in cases
+    ]
+    if checker is None:
+        from app.agents.claim_support import check_claim_support
+        from app.agents.summarizer import get_client
+
+        client = get_client()
+
+        def checker(items):
+            return check_claim_support(items, client, max_stories=len(items))
+
+    result = checker(stories)
+    correct = 0
+    misses = []
+    for case, story in zip(cases, result):
+        disputed = any(c.get("status") == "disputed" for c in story.claims)
+        if disputed == case["expected_disputed"]:
+            correct += 1
+        else:
+            misses.append({"id": case["id"], "expected_disputed": case["expected_disputed"]})
+    return {"accuracy": round(_ratio(correct, len(cases)), 3), "cases": len(cases), "misses": misses}
+
+
 def main(argv=None) -> None:
     args = sys.argv[1:] if argv is None else argv
     data = load_dataset()
     report = {"dedup": evaluate_dedup(data)}
     if "--priority" in args:
         report["priority"] = evaluate_priority(data)
+    if "--claims" in args:
+        report["claims"] = evaluate_claims(data)
     print(json.dumps(report, indent=2))
 
 

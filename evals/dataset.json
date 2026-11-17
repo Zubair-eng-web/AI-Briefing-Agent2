@@ -275,5 +275,67 @@
       "summary": "The match ended 2-1 in front of a small crowd.",
       "expected": "Low"
     }
+  ],
+  "claims": [
+    {
+      "id": "death-toll-conflict",
+      "title": "Earthquake death toll",
+      "evidence": [
+        [
+          "BBC World",
+          "Earthquake in the north kills 12 people, officials say. Rescuers are searching rubble."
+        ],
+        [
+          "Dawn",
+          "Earthquake death toll rises to 30 in the north, rescuers say. Hundreds are injured."
+        ]
+      ],
+      "expected_disputed": true
+    },
+    {
+      "id": "rates-consistent",
+      "title": "Central bank rates",
+      "evidence": [
+        [
+          "BBC World",
+          "Central bank raises interest rates to 5 percent to fight inflation."
+        ],
+        [
+          "The Guardian",
+          "Interest rates rise to 5 percent as the central bank tackles inflation, borrowers face higher costs."
+        ]
+      ],
+      "expected_disputed": false
+    },
+    {
+      "id": "match-winner-conflict",
+      "title": "Cricket final result",
+      "evidence": [
+        [
+          "Dawn",
+          "Pakistan beat India by five wickets in the final, the captain said after the match."
+        ],
+        [
+          "The Guardian",
+          "India beat Pakistan by five wickets in the final, the captain said after the match."
+        ]
+      ],
+      "expected_disputed": true
+    },
+    {
+      "id": "fire-detail-only",
+      "title": "Factory fire",
+      "evidence": [
+        [
+          "BBC World",
+          "Fire at a Lahore factory injures five people, police said."
+        ],
+        [
+          "Dawn",
+          "Lahore factory fire leaves five people hurt, rescue officials say; the fire brigade stayed at the scene for hours."
+        ]
+      ],
+      "expected_disputed": false
+    }
   ]
 }

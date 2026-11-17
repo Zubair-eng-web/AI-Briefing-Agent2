@@ -5,6 +5,8 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.alert_agent import send_alert
 from app.agents.analyzer import analyze_stories
+from app.agents.claim_checker import check_claims
+from app.agents.claim_support import check_claim_support
 from app.agents.email_agent import send_email
 from app.agents.factchecker import check_credibility
 from app.agents.ranker import rank_stories
@@ -90,6 +92,18 @@ def build_briefing_graph(
         confirmed = sum(1 for s in stories if s.credibility.startswith("Confirmed"))
         return {"stories": stories, "trace": [f"factcheck: {confirmed} confirmed by 2+ sources"]}
 
+    def claims_node(state: BriefingState):
+        try:
+            client = ai()
+        except Exception as e:
+            return {"trace": [f"claims: skipped ({type(e).__name__})"]}
+        stories = check_claims(state["stories"], client)
+        stories = check_claim_support(stories, client)
+        flagged = sum(
+            1 for s in stories if s.claim_notes or any(c.get("status") == "disputed" for c in s.claims)
+        )
+        return {"stories": stories, "trace": [f"claims: {flagged} stories with disputed claims"]}
+
     def rank_node(state: BriefingState):
         ranked = rank_stories(state["stories"])[:max_stories]
         critical = [s for s in ranked if s.priority == "Critical"]
@@ -126,6 +140,7 @@ def build_briefing_graph(
     graph.add_node("summarize", summarize_node)
     graph.add_node("analyze", analyze_node)
     graph.add_node("factcheck", factcheck_node)
+    graph.add_node("claims", claims_node)
     graph.add_node("rank", rank_node)
     graph.add_node("alert", alert_node)
     graph.add_node("email", email_node)
@@ -134,7 +149,8 @@ def build_briefing_graph(
     graph.add_conditional_edges("collect", after_collect, {"summarize": "summarize", END: END})
     graph.add_edge("summarize", "analyze")
     graph.add_edge("analyze", "factcheck")
-    graph.add_edge("factcheck", "rank")
+    graph.add_edge("factcheck", "claims")
+    graph.add_edge("claims", "rank")
     graph.add_conditional_edges("rank", after_rank, {"alert": "alert", "email": "email"})
     graph.add_edge("alert", "email")
     graph.add_edge("email", END)

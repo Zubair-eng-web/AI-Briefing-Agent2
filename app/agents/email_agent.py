@@ -60,6 +60,30 @@ def build_videos_html(videos: list[dict] | None) -> str:
     return "".join(parts)
 
 
+CLAIM_LABELS = {"confirmed": "confirmed", "disputed": "disputed", "single": "single source"}
+
+
+def _claim_line(c: dict) -> str:
+    label = CLAIM_LABELS.get(c.get("status"), "single source")
+    claim = c.get("claim", "")
+    who = ", ".join(c.get("supported_by", []))
+    against = ", ".join(c.get("contradicted_by", []))
+    detail = who + ("; against: " + against if against else "")
+    return f"{claim} [{label}: {detail}]"
+
+
+def claims_text(s) -> list[str]:
+    return ["  - " + _claim_line(c) for c in (getattr(s, "claims", None) or [])]
+
+
+def claims_html(s) -> str:
+    claims = getattr(s, "claims", None) or []
+    if not claims:
+        return ""
+    items = "".join("<li>" + escape(_claim_line(c)) + "</li>" for c in claims)
+    return '<ul style="margin:0 0 6px 18px;padding:0;font-size:13px;color:#444;">' + items + "</ul>"
+
+
 def build_html(stories: list[Story], date_str: str, videos: list[dict] | None = None) -> str:
     if not stories:
         body = "<p>Aaj koi nayi khabar nahi mili.</p>"
@@ -83,6 +107,7 @@ def build_html(stories: list[Story], date_str: str, videos: list[dict] | None = 
                 f'<span style="font-size:12px;color:#555;">&middot; {escape(s.credibility)}</span></div>'
                 f'<h3 style="margin:0 0 6px 0;color:#1a1a1a;">{i}. {escape(s.title)}</h3>'
                 f'<p style="margin:0 0 6px 0;color:#333;">{escape(s.summary)}</p>'
+                f'{claims_html(s)}'
                 f'<p style="margin:0;font-size:13px;color:#666;">Sources: {links}</p>'
                 "</div>"
             )
@@ -105,6 +130,7 @@ def build_text(stories: list[Story], date_str: str, videos: list[dict] | None = 
     for i, s in enumerate(stories, 1):
         lines.append(f"[{s.priority} | {s.sentiment} | {s.credibility}] {i}. {s.title}")
         lines.append(s.summary)
+        lines.extend(claims_text(s))
         for src, link in s.sources:
             lines.append(f"   {src}: {link}")
         lines.append("")
