@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.agents.deep_research import run_research
+from app.agents.research_web import add_web_sources
 from app.agents.research import ResearchError, answer_question
 from app.core.storage import (
     get_recent_articles,
@@ -143,7 +144,7 @@ def research(req: ResearchRequest):
     if len(topic) < 3:
         raise HTTPException(status_code=400, detail="Topic bohat chhota hai")
     try:
-        return run_research(topic)
+        return add_web_sources(run_research(topic), topic)
     except ValueError as e:  # GEMINI_API_KEY set nahi
         raise HTTPException(status_code=503, detail=str(e))
     except ResearchError as e:

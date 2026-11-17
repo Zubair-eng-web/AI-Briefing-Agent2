@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     # Research agent: khali sub-question ke liye ek follow-up search
     research_followup: bool = True
 
+    # Research report me web sources (billed Gemini key chahiye, default band)
+    research_web: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

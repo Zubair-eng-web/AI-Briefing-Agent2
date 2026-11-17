@@ -249,6 +249,12 @@ with research_tab:
         )
         st.markdown(utils.md_safe(research_result["report"]))
         render_sources(research_result.get("sources"))
+        web_part = research_result.get("web")
+        if web_part:
+            st.markdown("**Web sources**")
+            st.markdown(utils.md_safe(web_part["answer"]))
+            for s in web_part.get("sources", []):
+                st.markdown("- " + utils.link_markdown(s["title"], s["link"]))
 
     st.divider()
     st.subheader("Web par check karein")

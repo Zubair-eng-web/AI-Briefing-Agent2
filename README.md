@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 450 automated tests that all run offline (89% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: deploy the public demo, screenshots and web sources inside the research report.
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 480 automated tests that all run offline (89% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: deploy the public demo, web check inside the email, and screenshots.
 
 ## Project summary
 
@@ -203,6 +203,8 @@ render.yaml
 | 59 | Demo seed data | `python -m scripts.seed_demo` fills sample stories, articles and videos (only when empty, `--force` to redo); `render-demo.yaml` deploys a read-only demo (`DEMO_MODE=true`) that seeds itself on every start, no Docker |
 | 60 | Evals re-run | Priority accuracy rose from 0.875 to 1.0 after the step 58 prompt fix; all eval sets score 1.0 and README numbers are updated |
 | 61 | Client IP forwarding | The dashboard forwards each visitor's IP in `X-Forwarded-For` so login rate limits count real users, not the dashboard's single IP; nothing is sent when the IP is unknown |
+| 62 | README Phase 0 table | Phase 0 items 0.1 to 0.3 (one-command setup, offline tests and CI, config sync) are listed again next to 0.4 |
+| 63 | Web sources in research report | `RESEARCH_WEB=true` adds the Google Search grounded answer and real links to `POST /research` (`web` field) and to the dashboard Research tab; needs a billed Gemini key, off by default; any quota or network error leaves the normal report untouched |
 
 ### Product roadmap
 
@@ -231,7 +233,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | # | Item | Done when |
 |---|------|-----------|
 | 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; the outside-source check (`POST /research/web`) is done, using it inside email and dashboard is still open |
-| 2.2 | Deeper research agent (sub-question report and follow-up search done; web check endpoint done, web sources inside the report still open) | Web sources and follow-up searches are added to the report |
+| 2.2 | Deeper research agent (sub-question report and follow-up search done; web check endpoint done, web sources inside the report are opt-in with `RESEARCH_WEB=true` (step 63), email use still open) | Web sources and follow-up searches are added to the report |
 | 2.3 | Evaluation set (dedup, priority, claims and answers done) | The dedup and claims sets were extended in step 56; adding a case whenever the system errs stays open |
 
 **Phase 3: Production readiness (exit: safe to run for real users)**
