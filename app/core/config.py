@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     # Research report me web sources (billed Gemini key chahiye, default band)
     research_web: bool = False
 
+    # Digest email me web check (billed Gemini key chahiye, default band)
+    digest_web_check: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

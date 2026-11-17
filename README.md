@@ -212,6 +212,7 @@ render.yaml
 | 64 | Demo deploy kit | `scripts/smoke_demo.py` checks a deployed demo (health, docs, writes blocked), `docs/DEMO_DEPLOY.md` explains the Render deploy and the screenshots, `docs/screenshots/` is ready |
 | 66 | Web check in digest email | With `DIGEST_WEB_CHECK=true` the daily digest adds a Web check section for up to 2 Critical/High stories (disputed ones first) with real web links; needs a billed Gemini key, off by default, any error leaves the normal email untouched |
 | 67 | Preflight check | `python -m scripts.preflight --env-file .env` lists missing or unsafe production settings (never prints values) before you deploy |
+| 68 | Digest web check setting | `DIGEST_WEB_CHECK` is now a real setting (works from `.env` and the Render environment), default off |
 
 ### Product roadmap
 

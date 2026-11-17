@@ -1,5 +1,4 @@
 import operator
-import os
 from typing import Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -14,6 +13,7 @@ from app.agents.factchecker import check_credibility
 from app.agents.ranker import rank_stories
 from app.agents.summarizer import get_client
 from app.collectors.rss import collect_all
+from app.core.config import settings
 from app.core.storage import (
     filter_unalerted,
     get_undigested_articles,
@@ -53,7 +53,7 @@ def build_briefing_graph(
 ):
     """Briefing ka LangGraph banata hai. Saari dependencies inject ho sakti hain (testing ke liye)."""
     holder = {"client": client}
-    if web_checker is None and os.getenv("DIGEST_WEB_CHECK", "").lower() == "true":
+    if web_checker is None and settings.digest_web_check:
         from app.agents.web_check import web_check as web_checker
 
     def ai():
