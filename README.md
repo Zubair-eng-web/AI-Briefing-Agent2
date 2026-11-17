@@ -199,6 +199,7 @@ render.yaml
 | 55 | Web check in dashboard | The Research tab has a "Web par check karein" section (claim in, answer and real web links out); the web check CLI prints one clean error line on quota or key problems |
 | 56 | Bigger evaluation sets | 4 more dedup cases (two merge cases, two look-alike traps), 8 more priority cases and 4 more claim cases; the claim eval test now computes its expected numbers from the dataset, so the set can keep growing |
 | 57 | Secret scan and README order | `tests/test_secret_scan.py` scans every tracked file for key patterns (Gemini, GitHub, Resend, Telegram, private keys) and checks that no `.env` or `.db` file is tracked; README sections reordered and the latest evaluation results recorded |
+| 58 | Priority prompt and web quota message | The analyzer prompt now says that local civic and infrastructure news, education and business news are Medium, and that festivals and social events are Low (fixes the three Medium-labelled cases the model rated Low); the web check turns a quota error into one clear message |
 
 ### Product roadmap
 
@@ -256,7 +257,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 ## Notes and limitations
 
-- The web check uses Gemini Google Search grounding, which has its own quota. On the free tier it can answer 429; the API then returns 502 and `python -m app.agents.web_check` prints one clear error line.
+- The web check uses Gemini Google Search grounding, which has its own quota. In testing, the free tier answered 429 even though normal Gemini calls worked, so this feature needs a billed key; the API then returns 502 with a clear message and `python -m app.agents.web_check` prints one clear error line.
 - Facebook, Instagram and X are not included because their APIs are restricted or paid.
 - YouTube transcripts use the unofficial `youtube-transcript-api` library. It works locally, but YouTube often blocks cloud IP addresses.
 - Al Jazeera was replaced by The Guardian because its feed refused connections from the development network.

@@ -11,6 +11,10 @@ from app.core.config import settings
 
 MAX_SOURCES = 6
 NO_WEB = "Web par is baare me koi bharosemand source nahi mila."
+QUOTA_MSG = (
+    "Web search ka quota khatam hai ya free tier me band hai. "
+    "Thori der baad try karein ya billing check karein."
+)
 
 WEB_PROMPT = (
     "You are a careful fact-checking assistant. Using web search, check the claim or topic "
@@ -52,6 +56,8 @@ def web_check(text: str, client=None) -> dict:
             ),
         )
     except errors.APIError as e:
+        if "RESOURCE_EXHAUSTED" in str(e) or getattr(e, "code", None) == 429:
+            raise ResearchError(QUOTA_MSG) from e
         raise ResearchError(f"Gemini API error: {e}") from e
     answer = (response.text or "").strip()
     sources = extract_sources(response)

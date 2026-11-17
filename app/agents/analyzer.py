@@ -15,7 +15,10 @@ SYSTEM_PROMPT = (
     "accident, national emergency). Court verdicts, sentencing, election results and "
     "ongoing investigations are NOT Critical. At most 1 in 5 stories may be Critical. "
     "High (important politics, economy, policy, major crime), "
-    "Medium (general news, technology), Low (sports, entertainment, lifestyle).\n"
+    "Medium (general news, technology, business and product news, education, and local "
+    "civic or infrastructure news such as new public facilities, roads, transport or "
+    "council decisions), "
+    "Low (sports, entertainment, celebrity, lifestyle, festivals and social events).\n"
     "- sentiment: positive, negative or neutral (the tone of the news itself).\n"
     'Reply ONLY with a JSON array like: '
     '[{"id": 1, "priority": "High", "sentiment": "negative"}]. '
