@@ -250,3 +250,4 @@ with research_tab:
 
 with my_feed_tab:
     account.render_feed(limit)
+    account.render_sources()
