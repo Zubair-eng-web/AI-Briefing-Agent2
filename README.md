@@ -94,27 +94,13 @@ Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, 
 
 Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (digest on/off, Telegram chat id, digest hour), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`.
 
-## Deployment
-
-The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.yml`) wakes the service and calls `/run-digest`, `/run-alerts` and `/run-weekly` on a schedule. Secrets (`API_URL`, `API_KEY`) live in the repository's Actions secrets.
-
 ## Demo mode
 
 Set `DEMO_MODE=true` on a separate instance to make it read-only: every request that changes data (digests, accounts, settings, sources) answers 403, while reading, `/chat` and `/research` keep working. Use it for a public demo.
 
-## Evaluation
+## Deployment
 
-```bash
-python -m evals.run_eval              # dedup precision / recall / F1 (offline)
-python -m evals.run_eval --priority   # priority accuracy (calls Gemini)
-python -m evals.run_eval --claims     # does the claim check catch contradicting outlets (calls Gemini)
-```
-
-The labelled set lives in `evals/dataset.json`. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
-
-## License
-
-MIT, see `LICENSE`. Contributions are welcome, see `CONTRIBUTING.md`.
+The API and dashboard run on Render (`render.yaml`). GitHub Actions (`scheduled.yml`) wakes the service and calls `/run-digest`, `/run-alerts` and `/run-weekly` on a schedule. Secrets (`API_URL`, `API_KEY`) live in the repository's Actions secrets.
 
 ## Production checklist
 
@@ -132,6 +118,16 @@ Set these in the Render service environment (never commit them):
 | `RETENTION_DAYS` | Default 90, `0` turns cleanup off |
 
 The server logs one JSON line per request (method, path, status, duration, `request_id`) and answers every request with an `X-Request-ID` header, so a user can quote it when reporting a problem. Startup warns about unsafe settings. The rate limiter lives in memory: it resets on restart and is per instance.
+
+## Evaluation
+
+```bash
+python -m evals.run_eval              # dedup precision / recall / F1 (offline)
+python -m evals.run_eval --priority   # priority accuracy (calls Gemini)
+python -m evals.run_eval --claims     # does the claim check catch contradicting outlets (calls Gemini)
+```
+
+The labelled set lives in `evals/dataset.json`. Latest results with the real model (step 56): dedup 12 cases, precision and recall 1.0; claims 8 cases, accuracy 1.0; priority 24 cases, accuracy 0.875 (within one tier 1.0, Critical precision and recall 1.0). The misses are local civic news (library, campus, bike lanes) that the model rates Low where the label says Medium. It is small on purpose and meant to grow: add a case whenever the system gets something wrong. Run it before and after changing prompts, ranking or dedup.
 
 ## Project structure
 
@@ -202,6 +198,7 @@ render.yaml
 | 54 | Web source check | `POST /research/web` checks a claim or topic with Gemini Google Search grounding and returns the answer with real web links; it refuses to answer when no web source is found; limited to 20 requests per hour per IP; still works in demo mode |
 | 55 | Web check in dashboard | The Research tab has a "Web par check karein" section (claim in, answer and real web links out); the web check CLI prints one clean error line on quota or key problems |
 | 56 | Bigger evaluation sets | 4 more dedup cases (two merge cases, two look-alike traps), 8 more priority cases and 4 more claim cases; the claim eval test now computes its expected numbers from the dataset, so the set can keep growing |
+| 57 | Secret scan and README order | `tests/test_secret_scan.py` scans every tracked file for key patterns (Gemini, GitHub, Resend, Telegram, private keys) and checks that no `.env` or `.db` file is tracked; README sections reordered and the latest evaluation results recorded |
 
 ### Product roadmap
 
@@ -237,7 +234,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | 3.1 | Rate limiting and input validation (auth endpoints and query bounds done) | Abuse of public endpoints is blocked |
 | 3.2 | Structured logging and error monitoring (logging done) | Failures are visible without reading raw logs; error alerts (Telegram and email, rate limited) are done |
 | 3.3 | Backups and data retention (done) | Weekly cleanup runs; SQLite backup command exists; on PostgreSQL use the provider's backups or `pg_dump` |
-| 3.4 | Secrets and security review (checks done) | No secrets in the repo (verified); startup checks run; a CI dependency audit (`pip-audit`, non-blocking) is in place |
+| 3.4 | Secrets and security review (checks and secret-scan test done) | No secrets in the repo (verified); startup checks run; a CI dependency audit (`pip-audit`, non-blocking) is in place |
 | 3.5 | Scheduled video collection (done) | The daily digest runs the video step first; YouTube may block cloud IPs (see notes) |
 
 **Phase 4: Launch (exit: a stranger can understand and try it in five minutes)**
@@ -267,3 +264,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 - Source credibility and the claim check are LLM and rule based, not a full fact check.
 - Priority and sentiment are AI judgments and can occasionally be wrong.
 - Custom sources are fetched by the server, so URLs are limited to public http(s) addresses on ports 80 and 443 and re-checked before each run. Redirects and DNS rebinding are not fully covered. Custom sources also count as sources in the credibility label.
+
+## License
+
+MIT, see `LICENSE`. Contributions are welcome, see `CONTRIBUTING.md`.
