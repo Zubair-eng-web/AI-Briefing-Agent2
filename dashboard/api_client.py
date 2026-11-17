@@ -136,3 +136,20 @@ def save_delivery(token: str, digest_enabled: bool) -> dict:
     return _request(
         "PUT", "/me/delivery", json={"digest_enabled": digest_enabled}, extra_headers=_bearer(token)
     )
+
+
+def my_sources(token: str) -> dict:
+    return _request("GET", "/me/sources", extra_headers=_bearer(token))
+
+
+def add_my_source(token: str, kind: str, url: str, name: str) -> dict:
+    return _request(
+        "POST",
+        "/me/sources",
+        json={"kind": kind, "url": url, "name": name},
+        extra_headers=_bearer(token),
+    )
+
+
+def delete_my_source(token: str, source_id: int) -> dict:
+    return _request("DELETE", f"/me/sources/{source_id}", extra_headers=_bearer(token))

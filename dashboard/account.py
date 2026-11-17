@@ -96,3 +96,39 @@ def render_feed(limit: int) -> None:
             )
             st.markdown(utils.md_safe(story["summary"]))
             st.caption("Sources: " + utils.sources_markdown(story.get("sources", [])))
+
+
+def render_sources() -> None:
+    token = st.session_state.get("token")
+    if not token:
+        return
+    st.divider()
+    st.subheader("Meri sources")
+    try:
+        data = api_client.my_sources(token)
+    except api_client.ApiError as e:
+        st.warning(str(e))
+        return
+    st.caption(
+        f"{len(data['sources'])}/{data['limit']} sources. Ye sources sab ke digest ke liye "
+        "collect hoti hain aur '(custom)' label ke saath dikhti hain."
+    )
+    for src in data["sources"]:
+        left, right = st.columns([5, 1])
+        left.text(f"{src['name']} [{src['kind']}] {src['url']}")
+        if right.button("Delete", key=f"del_src_{src['id']}"):
+            try:
+                api_client.delete_my_source(token, src["id"])
+                st.rerun()
+            except api_client.ApiError as e:
+                st.warning(str(e))
+    kind = st.selectbox("Type", ["rss", "youtube"], key="src_kind")
+    name = st.text_input("Naam", key="src_name")
+    url = st.text_input("RSS feed URL ya YouTube channel ID (UC...)", key="src_url")
+    if st.button("Source add karein"):
+        try:
+            api_client.add_my_source(token, kind, url, name)
+            st.success("Source add ho gayi.")
+            st.rerun()
+        except api_client.ApiError as e:
+            st.warning(str(e))

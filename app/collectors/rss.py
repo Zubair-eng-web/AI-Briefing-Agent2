@@ -7,6 +7,8 @@ from typing import Optional
 import feedparser
 from bs4 import BeautifulSoup
 
+from app.core.user_sources import load_extra_feeds
+
 socket.setdefaulttimeout(10)
 
 # Kuch sites (jaise Al Jazeera) feedparser ke default User-Agent ko block karti hain
@@ -80,10 +82,12 @@ def fetch_feed(source: str, url: str, limit: int = 10) -> list[Article]:
     return articles
 
 
-def collect_all(limit_per_feed: int = 10) -> list[Article]:
+def collect_all(limit_per_feed: int = 10, extra_feeds: dict | None = None) -> list[Article]:
     """Saari feeds se articles collect karta hai."""
+    feeds = dict(FEEDS)
+    feeds.update(load_extra_feeds() if extra_feeds is None else extra_feeds)
     all_articles: list[Article] = []
-    for source, url in FEEDS.items():
+    for source, url in feeds.items():
         all_articles.extend(fetch_feed(source, url, limit_per_feed))
     return all_articles
 

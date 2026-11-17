@@ -21,6 +21,7 @@ def make_entry(i):
 @pytest.fixture(autouse=True)
 def no_delay(monkeypatch):
     monkeypatch.setattr(rss, "RETRY_DELAY", 0)
+    monkeypatch.setattr(rss, "load_extra_feeds", dict)
 
 
 def test_clean_html():

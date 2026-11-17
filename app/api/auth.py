@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app.core import ratelimit, users
+from app.core import ratelimit, user_sources, users
 from app.core.ratelimit import client_ip
 from app.core.config import settings
 from app.core.personalize import personalize_stories
@@ -113,3 +113,38 @@ def my_delivery(user: dict = Depends(get_current_user)):
 def update_my_delivery(req: Delivery, user: dict = Depends(get_current_user)):
     users.set_digest_enabled(user["id"], req.digest_enabled)
     return {"email": user["email"], "digest_enabled": users.get_digest_enabled(user["id"])}
+
+
+class SourceIn(BaseModel):
+    kind: str = Field(pattern="^(rss|youtube)$")
+    url: str = Field(min_length=3, max_length=500)
+    name: str = Field(default="", max_length=60)
+
+
+@router.get("/me/sources")
+def my_sources(user: dict = Depends(get_current_user)):
+    return {"limit": user_sources.MAX_PER_USER, "sources": user_sources.list_sources(user["id"])}
+
+
+@router.post("/me/sources", status_code=201)
+def add_my_source(req: SourceIn, user: dict = Depends(get_current_user)):
+    wait = ratelimit.hit(f"sources:{user['id']}", 30, 3600)
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail="Bohat zyada koshishein. Thori der baad dobara try karein",
+            headers={"Retry-After": str(int(wait) + 1)},
+        )
+    try:
+        return user_sources.add_source(user["id"], req.kind, req.url, req.name)
+    except user_sources.SourceExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except user_sources.SourceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/me/sources/{source_id}")
+def delete_my_source(source_id: int, user: dict = Depends(get_current_user)):
+    if not user_sources.delete_source(user["id"], source_id):
+        raise HTTPException(status_code=404, detail="Source nahi mili")
+    return {"deleted": source_id}

@@ -16,3 +16,6 @@ preview.html
 .coverage
 htmlcov/
 backups/
+
+*.bak
+*.db

@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 300 automated tests that all run offline (86% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Next: per-user sources, then Docker verification (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 300 automated tests that all run offline (86% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: per-user Telegram and digest time, then Docker verification (see the roadmap below).
 
 ## Project summary
 
@@ -92,7 +92,7 @@ Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, 
 
 `GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
 
-Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (daily digest on/off).
+Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (daily digest on/off), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`.
 
 ## Deployment
 
@@ -128,11 +128,11 @@ app/
   core/        config, database, models, storage, dedup, embeddings,
                search_store, interests, mailer, telegram_notifier, story, video,
                users, tokens, personalize, migrate, ratelimit, logging_setup,
-               security_checks
+               security_checks, maintenance, user_sources
   graph/       briefing (daily pipeline), alerts (breaking alerts)
 dashboard/     Streamlit app, accounts UI, API client, helpers
 tests/         automated tests (all external services are faked)
-migrations/    Alembic migration scripts (baseline 0001)
+migrations/    Alembic migration scripts (0001 baseline, 0002 user sources)
 .github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
 render.yaml, docker-compose.yml, Dockerfile
 ```
@@ -163,6 +163,7 @@ render.yaml, docker-compose.yml, Dockerfile
 | 35 | Rate limiting | Login and register are limited per IP, and login also per email (default 10 attempts per 5 minutes); answers 429 with `Retry-After` |
 | 36 | Logging and security checks | JSON logs, `X-Request-ID` on every response, hidden 500 details, security headers and startup warnings for unsafe settings |
 | 37 | Retention and backup | `POST /run-cleanup` (weekly in GitHub Actions) deletes articles, digested records and embeddings older than `RETENTION_DAYS` (default 90); `python -m app.core.maintenance backup` makes a safe SQLite backup and keeps the newest 7 |
+| 38 | User sources | Users add up to 8 RSS feeds or YouTube channels (`/me/sources`, dashboard form); only public http(s) URLs are accepted, re-checked before every collection; their stories carry a `(custom)` label; migration `0002` |
 
 ### Product roadmap
 
@@ -182,7 +183,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 | 1.1 | User accounts and login (done) | Register, login and signed tokens work; the shared API key still protects the core endpoints |
 | 1.2 | Per-user interests and ranking (done) | Each user has their own interests, priority boosts and feed |
 | 1.3 | Per-user delivery settings | Digest on/off is done; Telegram chat and digest time are still open |
-| 1.4 | User-managed sources | Users can add or remove their own RSS feeds and YouTube channels |
+| 1.4 | User-managed sources (done) | Sources are added to the shared collection; per-user filtering of the feed by own sources is still open |
 
 **Phase 2: Intelligence quality (exit: measurable accuracy gains)**
 
@@ -227,3 +228,4 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 - Emails are sent through Gmail SMTP with an App Password. Per-user digests need a provider that can send to any address (Gmail SMTP works; Resend's test sender only reaches your own address).
 - Source credibility and the claim check are LLM and rule based, not a full fact check.
 - Priority and sentiment are AI judgments and can occasionally be wrong.
+- Custom sources are fetched by the server, so URLs are limited to public http(s) addresses on ports 80 and 443 and re-checked before each run. Redirects and DNS rebinding are not fully covered. Custom sources also count as sources in the credibility label.

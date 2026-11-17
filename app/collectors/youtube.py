@@ -5,6 +5,7 @@ from typing import Optional
 
 import feedparser
 
+from app.core.user_sources import load_extra_channels
 from app.core.video import Video
 
 socket.setdefaulttimeout(10)
@@ -83,9 +84,14 @@ def collect_videos(
     channels=None,
     fetcher=fetch_channel,
     include_shorts: bool = False,
+    include_custom: bool | None = None,
 ) -> list[Video]:
     """Saare channels ke videos, naye pehle, duplicate IDs ke baghair. Shorts default me nahi."""
+    if include_custom is None:
+        include_custom = channels is None and fetcher is fetch_channel
     channels = channels or CHANNELS
+    if include_custom:
+        channels = {**channels, **load_extra_channels()}
     # Shorts hatane ke baad bhi kaafi videos bachein, is liye zyada fetch karte hain
     fetch_limit = limit_per_channel if include_shorts else limit_per_channel * 3
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, LargeBinary, String, Text
+from sqlalchemy import DateTime, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -115,3 +115,17 @@ class UserPrefDB(Base):
     user_id: Mapped[int] = mapped_column(primary_key=True)
     digest_enabled: Mapped[bool] = mapped_column(default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class UserSourceDB(Base):
+    """User ke apne RSS feeds aur YouTube channels."""
+
+    __tablename__ = "user_sources"
+    __table_args__ = (UniqueConstraint("user_id", "kind", "url", name="uq_user_source"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    kind: Mapped[str] = mapped_column(String(10))
+    name: Mapped[str] = mapped_column(String(100))
+    url: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
