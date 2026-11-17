@@ -274,6 +274,46 @@
       "title": "Local club wins friendly football match",
       "summary": "The match ended 2-1 in front of a small crowd.",
       "expected": "Low"
+    },
+    {
+      "title": "Dam collapse floods town, rescuers search for survivors",
+      "summary": "Water swept through streets overnight and many residents are missing.",
+      "expected": "Critical"
+    },
+    {
+      "title": "Passenger plane crashes shortly after take-off",
+      "summary": "Emergency crews are at the scene and survivors are being treated.",
+      "expected": "Critical"
+    },
+    {
+      "title": "Parliament passes major healthcare reform law",
+      "summary": "The law changes how hospitals are funded nationwide.",
+      "expected": "High"
+    },
+    {
+      "title": "Stock market falls sharply as oil prices jump",
+      "summary": "Investors reacted to supply fears and the index closed much lower.",
+      "expected": "High"
+    },
+    {
+      "title": "Tech company announces new laptop lineup",
+      "summary": "The range includes three models with longer battery life.",
+      "expected": "Medium"
+    },
+    {
+      "title": "University opens new campus for engineering students",
+      "summary": "The campus has labs and a student housing block.",
+      "expected": "Medium"
+    },
+    {
+      "title": "Popular singer shares holiday photos online",
+      "summary": "The photos were posted on social media over the weekend.",
+      "expected": "Low"
+    },
+    {
+      "title": "Local bakery wins best croissant award",
+      "summary": "The bakery received the prize at a regional food fair.",
+      "expected": "Low"
     }
   ],
   "claims": [
@@ -337,5 +377,129 @@
       ],
       "expected_disputed": false
     }
-  ]
+  ],
+  "answers": {
+    "docs": [
+      {
+        "id": "d1",
+        "source": "BBC World",
+        "link": "https://eval.example/d1",
+        "title": "Central bank raises interest rate to five percent",
+        "text": "The central bank raised its main interest rate to five percent to bring inflation down. Mortgage holders face higher monthly repayments."
+      },
+      {
+        "id": "d2",
+        "source": "Dawn",
+        "link": "https://eval.example/d2",
+        "title": "Floods in Sindh displace thousands of families",
+        "text": "Heavy monsoon rain caused flooding along the Indus river in Sindh. Thousands of families moved to relief camps."
+      },
+      {
+        "id": "d3",
+        "source": "TechCrunch",
+        "link": "https://eval.example/d3",
+        "title": "Startup unveils solar powered battery for homes",
+        "text": "A startup unveiled a solar battery that stores electricity for households. The device ships to customers next spring."
+      },
+      {
+        "id": "d4",
+        "source": "The Guardian",
+        "link": "https://eval.example/d4",
+        "title": "Parliament passes new housing bill after long debate",
+        "text": "Members of parliament approved the housing bill on Wednesday. The law limits rent increases in large cities."
+      },
+      {
+        "id": "d5",
+        "source": "Dawn",
+        "link": "https://eval.example/d5",
+        "title": "Pakistan cricket team arrives in Australia for Test series",
+        "text": "The squad landed in Perth ahead of three Tests. The captain said preparation camps went well."
+      },
+      {
+        "id": "d6",
+        "source": "BBC World",
+        "link": "https://eval.example/d6",
+        "title": "Earthquake strikes northern Japan, tsunami warning issued",
+        "text": "A strong earthquake hit the northern coast of Japan and authorities issued a tsunami warning. Rescue teams checked damaged buildings."
+      }
+    ],
+    "cases": [
+      {
+        "id": "rate-level",
+        "question": "What interest rate did the central bank set?",
+        "answerable": true,
+        "expected_doc_ids": [
+          "d1"
+        ]
+      },
+      {
+        "id": "flood-river",
+        "question": "Which river caused flooding in Sindh?",
+        "answerable": true,
+        "expected_doc_ids": [
+          "d2"
+        ]
+      },
+      {
+        "id": "battery-ship",
+        "question": "When will the solar battery ship?",
+        "answerable": true,
+        "expected_doc_ids": [
+          "d3"
+        ]
+      },
+      {
+        "id": "housing-limit",
+        "question": "What does the housing bill limit?",
+        "answerable": true,
+        "expected_doc_ids": [
+          "d4"
+        ]
+      },
+      {
+        "id": "cricket-landing",
+        "question": "Where did the cricket squad land?",
+        "answerable": true,
+        "expected_doc_ids": [
+          "d5"
+        ]
+      },
+      {
+        "id": "tsunami-warning",
+        "question": "Did a tsunami warning follow the earthquake in Japan?",
+        "answerable": true,
+        "expected_doc_ids": [
+          "d6"
+        ]
+      },
+      {
+        "id": "nobel",
+        "question": "Who won the Nobel prize in chemistry?",
+        "answerable": false,
+        "expected_doc_ids": [],
+        "kind": "no_match"
+      },
+      {
+        "id": "gold-price",
+        "question": "What is the price of gold today?",
+        "answerable": false,
+        "expected_doc_ids": [],
+        "kind": "no_match"
+      },
+      {
+        "id": "tokyo-residents",
+        "question": "How many residents does Tokyo have?",
+        "answerable": false,
+        "expected_doc_ids": [],
+        "kind": "no_match"
+      },
+      {
+        "id": "bank-chairman",
+        "question": "Who is the chairman of the central bank?",
+        "answerable": false,
+        "expected_doc_ids": [],
+        "kind": "near_miss"
+      }
+    ]
+  }
 }

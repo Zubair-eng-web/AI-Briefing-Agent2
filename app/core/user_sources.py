@@ -185,3 +185,35 @@ def load_extra_channels(session_factory=None) -> dict[str, str]:
         print(f"[WARN] Custom channels load nahi hue: {type(e).__name__}: {e}")
         return {}
     return _build(rows, lambda channel_id: bool(CHANNEL_RE.match(channel_id)))
+
+
+def own_source_labels(user_id: int, session_factory=None) -> set[str]:
+    """Wo '(custom)' labels jo is user ke apne RSS feeds ki stories par lagte hain.
+
+    Label banane ka rule load_extra_feeds jaisa hi hai: naam se label, ek URL ka ek label,
+    aur takrao par '#id'.
+    """
+    with _open(session_factory) as db:
+        rows = (
+            db.query(UserSourceDB)
+            .filter(UserSourceDB.kind == "rss")
+            .order_by(UserSourceDB.id)
+            .all()
+        )
+        data = [(r.id, r.name, r.url, r.user_id) for r in rows]
+    by_url: dict[str, str] = {}
+    used: set[str] = set()
+    mine: set[str] = set()
+    for source_id, name, url, owner in data:
+        key = by_url.get(url)
+        if key is None:
+            if len(used) >= MAX_EXTRA_PER_KIND:
+                continue
+            key = f"{name} (custom)"
+            if key in used:
+                key = f"{name} (custom #{source_id})"
+            by_url[url] = key
+            used.add(key)
+        if owner == user_id:
+            mine.add(key)
+    return mine

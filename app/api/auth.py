@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from app.core import ratelimit, user_sources, users
 from app.core.ratelimit import client_ip
 from app.core.config import settings
-from app.core.personalize import personalize_stories
+from app.core.personalize import hide_foreign_custom, personalize_stories
 from app.core.storage import get_recent_stories
 from app.core.tokens import create_token, verify_token
 
@@ -94,25 +94,55 @@ def update_my_interests(req: UserInterests, user: dict = Depends(get_current_use
 
 
 @router.get("/me/feed")
-def my_feed(limit: int = Query(20, ge=1, le=100), user: dict = Depends(get_current_user)):
-    """Recent stories re-ranked for this user's interests."""
-    ranked = personalize_stories(get_recent_stories(limit=100), user["interests"])[:limit]
-    return {"interests": user["interests"], "count": len(ranked), "stories": ranked}
+def my_feed(
+    limit: int = Query(20, ge=1, le=100),
+    scope: str = Query("all", pattern="^(all|mine)$"),
+    user: dict = Depends(get_current_user),
+):
+    """Recent stories re-ranked for this user's interests.
+
+    scope=mine hides stories that come only from other users' custom sources.
+    """
+    stories = get_recent_stories(limit=100)
+    if scope == "mine":
+        stories = hide_foreign_custom(stories, user_sources.own_source_labels(user["id"]))
+    ranked = personalize_stories(stories, user["interests"])[:limit]
+    return {"interests": user["interests"], "scope": scope, "count": len(ranked), "stories": ranked}
 
 
 class Delivery(BaseModel):
-    digest_enabled: bool
+    digest_enabled: bool | None = None
+    telegram_chat_id: str | None = Field(default=None, max_length=64)
+    digest_hour: int | None = Field(default=None, ge=0, le=23)
+
+
+def _delivery_payload(user: dict) -> dict:
+    return {"email": user["email"], **users.get_delivery_settings(user["id"])}
 
 
 @router.get("/me/delivery")
 def my_delivery(user: dict = Depends(get_current_user)):
-    return {"email": user["email"], "digest_enabled": users.get_digest_enabled(user["id"])}
+    return _delivery_payload(user)
 
 
 @router.put("/me/delivery")
 def update_my_delivery(req: Delivery, user: dict = Depends(get_current_user)):
-    users.set_digest_enabled(user["id"], req.digest_enabled)
-    return {"email": user["email"], "digest_enabled": users.get_digest_enabled(user["id"])}
+    """Sirf wahi fields badalti hain jo bheji gayi hon. digest_hour null = main digest ke saath."""
+    sent = req.model_fields_set
+    changes = {}
+    if "digest_enabled" in sent and req.digest_enabled is not None:
+        changes["digest_enabled"] = req.digest_enabled
+    if "telegram_chat_id" in sent:
+        changes["telegram_chat_id"] = req.telegram_chat_id or ""
+    if "digest_hour" in sent:
+        changes["digest_hour"] = req.digest_hour
+    try:
+        saved = users.update_delivery_settings(user["id"], **changes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if saved is None:
+        raise HTTPException(status_code=404, detail="User nahi mila")
+    return _delivery_payload(user)
 
 
 class SourceIn(BaseModel):

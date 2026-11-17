@@ -27,3 +27,16 @@ def personalize_stories(stories: list[dict], interests: list[str]) -> list[dict]
         )
         enriched.append(item)
     return sorted(enriched, key=key)
+
+
+CUSTOM_MARK = "(custom"
+
+
+def hide_foreign_custom(stories: list[dict], own_labels: set[str]) -> list[dict]:
+    """Wo stories hataata hai jo sirf dusre users ki custom sources se aayi hon."""
+
+    def foreign_only(story: dict) -> bool:
+        names = [s.get("source", "") for s in story.get("sources") or []]
+        return bool(names) and all(CUSTOM_MARK in n and n not in own_labels for n in names)
+
+    return [s for s in stories if not foreign_only(s)]

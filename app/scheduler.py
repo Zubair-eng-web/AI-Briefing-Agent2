@@ -7,6 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.agents.user_digest import send_user_digests
+from app.core import error_alerts
 from app.core.config import settings
 from app.core.storage import (
     get_recent_videos,
@@ -85,6 +86,15 @@ def run_digest(runner=run_briefing, include_all: bool = False, video_job=None) -
     return result
 
 
+def run_user_digests(sender=send_user_digests) -> dict:
+    """Opted-in users ko unke apne waqt par digest (din me ek baar)."""
+    if not settings.auth_secret:
+        return {"sent": 0, "skipped": 0, "failed": 0}
+    result = sender(only_scheduled=True)
+    print(f"--- User digests ({datetime.now().strftime('%H:%M:%S')}) --- {result}")
+    return result
+
+
 def run_alerts(runner=run_alert_check) -> dict:
     result = runner()
     print_trace("Alert check", result)
@@ -99,6 +109,7 @@ def safe_run(job, name: str) -> bool:
             return True
         except Exception as e:
             print(f"[ERROR] {name} fail hui: {type(e).__name__}: {e}")
+            error_alerts.report(f"{name} fail hui", f"{type(e).__name__}: {str(e)[:200]}")
             return False
 
 
@@ -115,7 +126,11 @@ def main() -> None:
     if "--weekly-now" in sys.argv:
         run_weekly()
         return
+    if "--user-digests-now" in sys.argv:
+        run_user_digests()
+        return
 
+    error_alerts.install()
     hour, minute = parse_time(settings.digest_time)
     interval = max(1, settings.alert_interval_minutes)
 
@@ -134,6 +149,14 @@ def main() -> None:
         coalesce=True,
         max_instances=1,
     )
+    if settings.auth_secret:
+        scheduler.add_job(
+            lambda: safe_run(run_user_digests, "User digests"),
+            CronTrigger(minute=5),
+            misfire_grace_time=1800,
+            coalesce=True,
+            max_instances=1,
+        )
     weekly_note = ""
     if settings.weekly_enabled:
         w_hour, w_minute = parse_time(settings.weekly_time)

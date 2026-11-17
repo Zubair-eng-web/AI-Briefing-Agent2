@@ -118,8 +118,11 @@ def login(email: str, password: str) -> dict:
     return _request("POST", "/auth/login", json={"email": email, "password": password})
 
 
-def my_feed(token: str, limit: int = 20) -> dict:
-    return _request("GET", "/me/feed", params={"limit": limit}, extra_headers=_bearer(token))
+def my_feed(token: str, limit: int = 20, scope: str = "all") -> dict:
+    params: dict = {"limit": limit}
+    if scope != "all":
+        params["scope"] = scope
+    return _request("GET", "/me/feed", params=params, extra_headers=_bearer(token))
 
 
 def save_my_interests(token: str, interests: str) -> dict:
@@ -132,10 +135,22 @@ def get_delivery(token: str) -> dict:
     return _request("GET", "/me/delivery", extra_headers=_bearer(token))
 
 
-def save_delivery(token: str, digest_enabled: bool) -> dict:
-    return _request(
-        "PUT", "/me/delivery", json={"digest_enabled": digest_enabled}, extra_headers=_bearer(token)
-    )
+_UNSET = object()
+
+
+def save_delivery(
+    token: str, digest_enabled=_UNSET, telegram_chat_id=_UNSET, digest_hour=_UNSET
+) -> dict:
+    """Sirf wahi fields bhejti hai jo di gayi hon (digest_hour=None matlab main digest ke saath)."""
+    body = {}
+    for key, value in (
+        ("digest_enabled", digest_enabled),
+        ("telegram_chat_id", telegram_chat_id),
+        ("digest_hour", digest_hour),
+    ):
+        if value is not _UNSET:
+            body[key] = value
+    return _request("PUT", "/me/delivery", json=body, extra_headers=_bearer(token))
 
 
 def my_sources(token: str) -> dict:

@@ -24,7 +24,7 @@ def scalar(url, sql):
 
 def test_fresh_database_matches_models(url):
     upgrade_database(url)
-    assert scalar(url, "SELECT version_num FROM alembic_version") == "0003"
+    assert scalar(url, "SELECT version_num FROM alembic_version") == "0004"
     engine = create_engine(url)
     try:
         with engine.connect() as conn:
@@ -47,7 +47,7 @@ def test_legacy_database_is_stamped_and_data_kept(url):
     engine.dispose()
 
     upgrade_database(url)
-    assert scalar(url, "SELECT version_num FROM alembic_version") == "0003"
+    assert scalar(url, "SELECT version_num FROM alembic_version") == "0004"
     assert scalar(url, "SELECT value FROM app_settings WHERE key = 'interests'") == "ai"
 
 

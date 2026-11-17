@@ -2,7 +2,7 @@
 
 > An autonomous multi-agent AI system that reads news and YouTube for you, analyzes everything with Google Gemini, and delivers a prioritized daily briefing, breaking-news alerts (email and Telegram) and a weekly intelligence report. It also ships a REST API, a Streamlit dashboard and a research chat that answers questions from the collected news with source citations (RAG).
 
-**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 300 automated tests that all run offline (86% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: per-user Telegram and digest time, then Docker verification (see the roadmap below).
+**Status:** working end to end, deployed on Render with GitHub Actions scheduling, covered by over 450 automated tests that all run offline (89% coverage), with lint and a coverage gate in CI. Accounts, personal feeds, per-user digests and migrations are in place. Login rate limiting, JSON logs with request IDs and startup security checks are in place. Retention cleanup and SQLite backups are in place. Users can add their own sources. Next: a public read-only demo, screenshots and outside-source fact checking.
 
 ## Project summary
 
@@ -55,9 +55,11 @@ The daily pipeline is orchestrated with **LangGraph**: conditional edges skip al
 
 ## Tech stack
 
-Python 3.11, FastAPI, LangGraph, Google Gemini (summaries, analysis, embeddings), scikit-learn, SQLAlchemy with Alembic migrations (SQLite by default, PostgreSQL supported), APScheduler, Streamlit, feedparser, youtube-transcript-api, pytest, Docker Compose, GitHub Actions, Render.
+Python 3.11, FastAPI, LangGraph, Google Gemini (summaries, analysis, embeddings), scikit-learn, SQLAlchemy with Alembic migrations (SQLite by default, PostgreSQL supported), APScheduler, Streamlit, feedparser, youtube-transcript-api, pytest, GitHub Actions, Render.
 
 ## Quick start
+
+One command setup (no Docker needed): `powershell -ExecutionPolicy Bypass -File scripts/setup.ps1` on Windows, `bash scripts/setup.sh` on Linux/Mac.
 
 ```bash
 python -m venv venv
@@ -75,11 +77,9 @@ python -m pytest tests -q                    # run the test suite
 python -m app.core.migrate                   # create or upgrade the database schema
 ```
 
-A Docker Compose setup (PostgreSQL, API, scheduler, dashboard) is included: `docker compose up --build -d`.
-
 ## Configuration
 
-Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `DATABASE_URL`, `API_KEY`, `DASHBOARD_PASSWORD`, `INTERESTS` (comma-separated keywords, optional), `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` (optional). Accounts need `AUTH_SECRET` (a long random string; leave it empty to switch accounts off) and optionally `AUTH_TOKEN_HOURS` (token lifetime, default 72).
+Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `DATABASE_URL`, `API_KEY`, `DASHBOARD_PASSWORD`, `INTERESTS` (comma-separated keywords, optional), `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` (optional). Accounts need `AUTH_SECRET` (a long random string; leave it empty to switch accounts off) and optionally `AUTH_TOKEN_HOURS` (token lifetime, default 72). Run `python -m scripts.sync_env_example` to add any setting missing from `.env.example`.
 
 ### Telegram setup
 
@@ -90,9 +90,9 @@ Copy `.env.example` to `.env`. Main settings: `GEMINI_API_KEY`, `EMAIL_SENDER`, 
 
 ## API
 
-`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
+`GET /health`, `/stories`, `/articles`, `/stats`, `/videos`, `/weekly`, `/interests`, `PUT /interests`, and `POST /chat`, `/research`, `/run-digest`, `/run-alerts`, `/run-videos`, `/run-weekly`, `/run-cleanup`, `/run-user-digests`. Interactive docs are served at `/docs`. The core endpoints require the `X-API-Key` header when `API_KEY` is set.
 
-Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (daily digest on/off), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`.
+Account endpoints use `Authorization: Bearer <token>`: `POST /auth/register`, `POST /auth/login`, `GET /me`, `PUT /me/interests`, `GET /me/feed`, `GET /me/delivery` and `PUT /me/delivery` (digest on/off, Telegram chat id, digest hour), `GET /me/sources`, `POST /me/sources` and `DELETE /me/sources/{id}`.
 
 ## Deployment
 
@@ -134,7 +134,7 @@ The server logs one JSON line per request (method, path, status, duration, `requ
 ```
 app/
   main.py, pipeline.py, scheduler.py, video_pipeline.py, weekly.py
-  agents/      summarizer, analyzer, factchecker, claim_checker, ranker,
+  agents/      summarizer, analyzer, factchecker, claim_checker, claim_support, ranker,
                alert_agent, email_agent, research, deep_research,
                video_agent, weekly_email, user_digest
   api/         routes, security, auth, middleware
@@ -145,11 +145,12 @@ app/
                security_checks, maintenance, user_sources
   graph/       briefing (daily pipeline), alerts (breaking alerts)
 dashboard/     Streamlit app, accounts UI, API client, helpers
+scripts/       setup.ps1, setup.sh, sync_env_example.py
 tests/         automated tests (all external services are faked)
 evals/         labelled dataset and quality evaluation
-migrations/    Alembic migration scripts (0001 baseline, 0002 user sources, 0003 story claims)
+migrations/    Alembic migration scripts (0001 baseline, 0002 user sources, 0003 story claims, 0004 user delivery)
 .github/workflows/  tests.yml (CI), scheduled.yml (calls the deployed API)
-render.yaml, docker-compose.yml, Dockerfile
+render.yaml
 ```
 
 ## Development progress
@@ -158,7 +159,7 @@ render.yaml, docker-compose.yml, Dockerfile
 
 | # | Step | What was built |
 |---|------|----------------|
-| 1-21 | Core system | Environment, structure, config, RSS, database and dedup, Gemini summaries, pipeline, email digest, scheduler, priority and sentiment, source credibility, LangGraph orchestration, breaking alerts, REST API, research chat (RAG) with embeddings, dashboard, YouTube intelligence, weekly report, Docker and PostgreSQL support, GitHub |
+| 1-21 | Core system | Environment, structure, config, RSS, database and dedup, Gemini summaries, pipeline, email digest, scheduler, priority and sentiment, source credibility, LangGraph orchestration, breaking alerts, REST API, research chat (RAG) with embeddings, dashboard, YouTube intelligence, weekly report, PostgreSQL support, GitHub |
 | 22 | CI | GitHub Actions workflow running the test suite on every push |
 | 23 | Telegram notifier | Standalone notifier module with offline tests |
 | 24 | Telegram alerts | Critical stories also go to Telegram after the email; failures never block the pipeline |
@@ -185,6 +186,14 @@ render.yaml, docker-compose.yml, Dockerfile
 | 42 | Per-claim support | One extra LLM call extracts up to 3 key claims for multi-outlet stories and marks each as confirmed, disputed or single source by outlet; shown in the digest email |
 | 43 | Claim check wired into the daily graph | The `claims` step now runs in the briefing graph; before this the claim check only ran in the standalone pipeline |
 | 44 | Claims in database, API and dashboard | `stories.claims_json` (migration `0003`); `/stories` and `/me/feed` return `claims`; dashboard cards and per-user digests show them. App startup now runs Alembic migrations once per process |
+| 45 | Per-user delivery | Each user sets a Telegram chat id (short top-5 list after the email) and an own digest hour (UTC); users without an hour get theirs with the main digest. `POST /run-user-digests` runs hourly at :05 from GitHub Actions; migration `0004` |
+| 46 | Feed scope | `GET /me/feed?scope=mine` hides stories that come only from other users' custom sources (default `all` is unchanged); dashboard checkbox in My feed |
+| 47 | Query bounds | `/stories?hours=` is capped at one year (8760), so absurd values answer 422 instead of a server error |
+| 48 | Error alerts and audit | Server 500s and failed scheduler jobs send a Telegram and email alert (same error at most once per `ERROR_ALERT_COOLDOWN_MINUTES`, at most 10 per hour; no request data in the alert); CI runs a non-blocking `pip-audit` job |
+| 49 | Research follow-up search | A sub-question that finds no matching news gets one rewritten follow-up search (one extra LLM call, one round only); if it still finds nothing it stays under "Not covered". `RESEARCH_FOLLOWUP=false` turns it off |
+| 50 | Answer-quality evaluation | `python -m evals.run_eval --answers` runs the research chat on a small fixed news library: does it cite the right source, and does it refuse questions the news cannot answer (refusal is a text heuristic). The priority set grew from 8 to 16 cases |
+| 51 | Coverage | Offline tests for the pipeline, summarizer, video pipeline and the scheduler entry points (flags, job wiring, user digests after the main digest) |
+| 52 | Docs and setup sync | One-command setup scripts (no Docker), `scripts/sync_env_example.py` keeps `.env.example` in step with the settings and a test guards it, README brought up to date |
 
 ### Product roadmap
 
@@ -194,8 +203,7 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 
 | # | Item | Done when |
 |---|------|-----------|
-| 0.1 | Verify Docker Compose stack (planned last) | `docker compose up` brings up PostgreSQL, API, scheduler and dashboard; `/health` is OK |
-| 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0003`), so existing databases get new columns |
+| 0.4 | Database migrations (done) | Startup runs `create_all` and then Alembic (`0001` to `0004`), so existing databases get new columns |
 
 **Phase 1: Multi-user foundation (exit: two users see different feeds)**
 
@@ -203,25 +211,25 @@ Each phase has a clear exit criterion. A phase is done only when its criterion i
 |---|------|-----------|
 | 1.1 | User accounts and login (done) | Register, login and signed tokens work; the shared API key still protects the core endpoints |
 | 1.2 | Per-user interests and ranking (done) | Each user has their own interests, priority boosts and feed |
-| 1.3 | Per-user delivery settings | Digest on/off is done; Telegram chat and digest time are still open |
-| 1.4 | User-managed sources (done) | Sources are added to the shared collection; per-user filtering of the feed by own sources is still open |
+| 1.3 | Per-user delivery settings (done) | Digest on/off, own Telegram chat id and own digest hour (UTC) |
+| 1.4 | User-managed sources (done) | Sources are added to the shared collection; the feed can hide other users' custom sources (`?scope=mine`) |
 
 **Phase 2: Intelligence quality (exit: measurable accuracy gains)**
 
 | # | Item | Done when |
 |---|------|-----------|
 | 2.1 | Per-claim fact-checking (claims vs outlets done) | Claims are checked across outlets, stored, served by the API and shown in email and dashboard; verifying against outside sources is still open |
-| 2.2 | Deeper research agent | Web sources and follow-up searches are added to the report |
-| 2.3 | Evaluation set (dedup and priority done) | Answer-quality evaluation and a larger dataset are still open |
+| 2.2 | Deeper research agent (sub-question report and follow-up search done; web sources still open) | Web sources and follow-up searches are added to the report |
+| 2.3 | Evaluation set (dedup, priority, claims and answers done) | A larger dedup and claims set is still open |
 
 **Phase 3: Production readiness (exit: safe to run for real users)**
 
 | # | Item | Done when |
 |---|------|-----------|
-| 3.1 | Rate limiting and input validation (auth endpoints done) | Abuse of public endpoints is blocked |
-| 3.2 | Structured logging and error monitoring (logging done) | Failures are visible without reading raw logs; error alerts are still open |
+| 3.1 | Rate limiting and input validation (auth endpoints and query bounds done) | Abuse of public endpoints is blocked |
+| 3.2 | Structured logging and error monitoring (logging done) | Failures are visible without reading raw logs; error alerts (Telegram and email, rate limited) are done |
 | 3.3 | Backups and data retention (done) | Weekly cleanup runs; SQLite backup command exists; on PostgreSQL use the provider's backups or `pg_dump` |
-| 3.4 | Secrets and security review (checks done) | No secrets in the repo (verified); startup checks run; dependency audit is still open |
+| 3.4 | Secrets and security review (checks done) | No secrets in the repo (verified); startup checks run; a CI dependency audit (`pip-audit`, non-blocking) is in place |
 | 3.5 | Scheduled video collection (done) | The daily digest runs the video step first; YouTube may block cloud IPs (see notes) |
 
 **Phase 4: Launch (exit: a stranger can understand and try it in five minutes)**

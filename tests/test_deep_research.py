@@ -72,11 +72,11 @@ def test_only_cited_sources_are_returned():
 
 
 def test_no_matching_news_skips_report_call():
-    client = FakeClient([json.dumps(["volcano eruption Iceland"])])
+    client = FakeClient([json.dumps(["volcano eruption Iceland"]), json.dumps(["lava ash Reykjavik"])])
     result = run_research("volcano eruption Iceland", client, make_docs(), semantic=False)
     assert result["report"] == NO_INFO
     assert result["sources"] == []
-    assert client.calls == 1
+    assert client.calls == 2  # plan + ek follow-up search, report call nahi
 
 
 def test_plan_failure_falls_back_to_topic():

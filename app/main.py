@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI
 from app.api.auth import router as auth_router
 from app.api.routes import router
 from app.api.security import require_api_key
+from app.core import error_alerts
 from app.core.config import settings
 from app.api.middleware import add_http_middleware
 from app.core.database import init_db
@@ -16,6 +17,7 @@ from app.core.security_checks import security_warnings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # server start hote hi tables tayyar
+    error_alerts.install()
     for warning in security_warnings(settings):
         logging.getLogger("app.startup").warning(warning)
     yield

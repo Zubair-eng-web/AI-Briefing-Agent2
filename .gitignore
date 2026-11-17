@@ -5,7 +5,7 @@ __pycache__/
 *.db
 .DS_Store
 .vscode/
-preview.htmlpreview.html
+preview.html
 alert_preview.html
 .pytest_cache/
 preview.html
@@ -19,3 +19,4 @@ backups/
 
 *.bak
 *.db
+bundle_*.txt

@@ -41,6 +41,8 @@ def test_default_off_then_toggle(client):
     assert client.get("/me/delivery", headers=a).json() == {
         "email": "a@example.com",
         "digest_enabled": False,
+        "telegram_chat_id": "",
+        "digest_hour": None,
     }
     r = client.put("/me/delivery", json={"digest_enabled": True}, headers=a)
     assert r.json()["digest_enabled"] is True

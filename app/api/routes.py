@@ -12,7 +12,15 @@ from app.core.storage import (
 from app.core.interests import get_interests, save_interests
 from app.core.maintenance import cleanup_old_data
 from app.core.story import PRIORITIES
-from app.scheduler import is_busy, run_alerts, run_digest, run_videos, run_weekly, safe_run
+from app.scheduler import (
+    is_busy,
+    run_alerts,
+    run_digest,
+    run_user_digests,
+    run_videos,
+    run_weekly,
+    safe_run,
+)
 from app.weekly import build_weekly_report
 
 router = APIRouter()
@@ -26,7 +34,7 @@ class ChatRequest(BaseModel):
 def list_stories(
     limit: int = Query(20, ge=1, le=100),
     priority: str | None = None,
-    hours: int | None = Query(None, ge=1),
+    hours: int | None = Query(None, ge=1, le=24 * 365),
 ):
     if priority is not None:
         priority = priority.strip().capitalize()
@@ -146,3 +154,9 @@ def research(req: ResearchRequest):
 def trigger_cleanup(background_tasks: BackgroundTasks):
     """Purana data (retention) background me saaf karta hai."""
     return _start(cleanup_old_data, "Cleanup", background_tasks)
+
+
+@router.post("/run-user-digests")
+def trigger_user_digests(background_tasks: BackgroundTasks):
+    """Opted-in users ko unke apne waqt ki digest background me bhejta hai."""
+    return _start(run_user_digests, "User digests", background_tasks)

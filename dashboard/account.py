@@ -37,14 +37,54 @@ def render_sidebar() -> None:
         _sign_in(api_client.register, email, password)
 
 
+HOUR_CHOICES = ["Main digest ke saath"] + [f"{h:02d}:00 UTC" for h in range(24)]
+
+
+def _render_delivery(token: str) -> None:
+    try:
+        delivery = api_client.get_delivery(token)
+    except api_client.ApiError as e:
+        st.warning(str(e))
+        return
+    hour = delivery.get("digest_hour")
+    with st.form("delivery_form"):
+        wanted = st.checkbox(
+            f"Daily digest meri email par bhejein ({delivery['email']})",
+            value=delivery["digest_enabled"],
+        )
+        chat = st.text_input(
+            "Telegram chat id (optional)",
+            value=delivery.get("telegram_chat_id", ""),
+            placeholder="123456789 ya @channelname",
+        )
+        choice = st.selectbox(
+            "Digest ka waqt (UTC, Pakistan = UTC+5)",
+            HOUR_CHOICES,
+            index=0 if hour is None else hour + 1,
+        )
+        saved = st.form_submit_button("Save delivery settings")
+    st.caption("Telegram ke liye pehle apne bot ko /start bhejein, phir apni chat id yahan likhein.")
+    if saved:
+        new_hour = None if choice == HOUR_CHOICES[0] else HOUR_CHOICES.index(choice) - 1
+        try:
+            api_client.save_delivery(token, wanted, chat.strip(), new_hour)
+            st.success("Delivery settings save ho gayi.")
+        except api_client.ApiError as e:
+            st.warning(str(e))
+
+
 def render_feed(limit: int) -> None:
     token = st.session_state.get("token")
     if not token:
         st.info("Apni personal feed ke liye sidebar se Login ya Register karein.")
         return
 
+    only_mine = st.checkbox(
+        "Dusre users ki custom sources ki stories chhupayein", key="feed_only_mine"
+    )
+    scope_args = {"scope": "mine"} if only_mine else {}
     try:
-        feed = api_client.my_feed(token, limit=limit)
+        feed = api_client.my_feed(token, limit=limit, **scope_args)
     except api_client.ApiError as e:
         st.warning(f"Feed nahi mili: {e}")
         if st.button("Logout karein", key="feed_logout"):
@@ -66,18 +106,7 @@ def render_feed(limit: int) -> None:
         except api_client.ApiError as e:
             st.warning(str(e))
 
-    try:
-        delivery = api_client.get_delivery(token)
-        wanted = st.checkbox(
-            f"Daily digest meri email par bhejein ({delivery['email']})",
-            value=delivery["digest_enabled"],
-            key="digest_enabled",
-        )
-        if wanted != delivery["digest_enabled"]:
-            api_client.save_delivery(token, wanted)
-            st.success("Delivery setting save ho gayi.")
-    except api_client.ApiError as e:
-        st.warning(str(e))
+    _render_delivery(token)
 
     if not feed["stories"]:
         st.info("Abhi koi story nahi. Pehle digest chalayein.")

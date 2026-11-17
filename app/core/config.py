@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     weekly_day: str = "sun"
     weekly_time: str = "09:00"
 
-    # Database: default SQLite. Docker/Render me PostgreSQL URL milta hai
+    # Database: default SQLite; hosted deployments can use a PostgreSQL URL
     database_url: str = "sqlite:///briefing.db"
 
     # Security (khali = band, local development ke liye)
@@ -62,6 +62,13 @@ class Settings(BaseSettings):
 
     # Data retention: itne din se purane articles/embeddings delete (0 = band)
     retention_days: int = 90
+
+    # Error alerts (Telegram + email); ek hi error ka alert cooldown ke baad dobara
+    error_alerts: bool = True
+    error_alert_cooldown_minutes: int = 60
+
+    # Research agent: khali sub-question ke liye ek follow-up search
+    research_followup: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

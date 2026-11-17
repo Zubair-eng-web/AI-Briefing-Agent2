@@ -7,6 +7,7 @@ import uuid
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.core import error_alerts
 from app.core.logging_setup import request_id_var
 
 log = logging.getLogger("app.http")
@@ -29,8 +30,12 @@ def add_http_middleware(app: FastAPI) -> None:
         try:
             try:
                 response = await call_next(request)
-            except Exception:
+            except Exception as exc:
                 log.exception("unhandled error", extra={"fields": fields})
+                error_alerts.report(
+                    f"Server error 500: {request.method} {request.url.path}",
+                    f"request_id={request_id} error={type(exc).__name__}",
+                )
                 response = JSONResponse(
                     {"detail": "Server me masla aaya", "request_id": request_id}, status_code=500
                 )

@@ -112,14 +112,93 @@ def gather(queries: list[str], docs: list[Doc], client, semantic: bool):
     return merged, coverage, method
 
 
-def run_research(topic: str, client=None, docs: list[Doc] | None = None, semantic: bool | None = None) -> dict:
+FOLLOWUP_PROMPT = (
+    "Earlier keyword searches over a database of news articles found nothing for the queries "
+    "below (a JSON array). For each query, write ONE different English search query of 3 to 8 "
+    "keywords: use synonyms or a broader angle, keep names and places, and add no facts. "
+    "Reply ONLY with a JSON array of strings, in the same order and of the same length."
+)
+
+
+def parse_followups(text: str, originals: list[str]) -> list[str]:
+    """Model ka jawab originals ke saath align karta hai. Bekaar ya wahi query ho to '' (skip)."""
+    text = (text or "").strip()
+    text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = []
+    if not isinstance(data, list):
+        data = []
+    result = []
+    for i, original in enumerate(originals):
+        q = " ".join(str(data[i]).split())[:200] if i < len(data) else ""
+        if q.lower() == original.lower():
+            q = ""
+        result.append(q)
+    return result
+
+
+def plan_followups(missing: list[str], client) -> list[str]:
+    try:
+        response = client.models.generate_content(
+            model=settings.llm_model,
+            contents=json.dumps(missing, ensure_ascii=False),
+            config=types.GenerateContentConfig(
+                system_instruction=FOLLOWUP_PROMPT,
+                response_mime_type="application/json",
+                temperature=0,
+                max_output_tokens=300,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            ),
+        )
+        return parse_followups(response.text, missing)
+    except Exception as e:  # best-effort: fail ho to research bina follow-up ke chalti hai
+        print(f"[WARN] Follow-up search fail: {type(e).__name__}")
+        return [""] * len(missing)
+
+
+def followup_round(coverage, hits, docs, client, semantic):
+    """Khali sub-questions ke liye ek naya search (sirf ek round). (hits, coverage) wapis."""
+    missing = [i for i, c in enumerate(coverage) if c["hits"] == 0]
+    if not missing:
+        return hits, coverage
+    new_queries = plan_followups([coverage[i]["question"] for i in missing], client)
+    pairs = [(i, q) for i, q in zip(missing, new_queries) if q]
+    if not pairs:
+        return hits, coverage
+    extra_hits, extra_cov, _ = gather([q for _, q in pairs], docs, client, semantic)
+    coverage = [dict(c) for c in coverage]
+    for (i, q), cov in zip(pairs, extra_cov):
+        coverage[i]["hits"] = cov["hits"]
+        coverage[i]["followup"] = q
+    best = {id(d): (d, s) for d, s in hits}
+    for d, s in extra_hits:
+        if id(d) not in best or s > best[id(d)][1]:
+            best[id(d)] = (d, s)
+    merged = sorted(best.values(), key=lambda x: -x[1])[:MAX_CONTEXT_DOCS]
+    return merged, coverage
+
+
+def run_research(
+    topic: str,
+    client=None,
+    docs: list[Doc] | None = None,
+    semantic: bool | None = None,
+    followup: bool | None = None,
+) -> dict:
     client = client or get_client()
     docs = docs if docs is not None else load_documents()
     if semantic is None:
         semantic = settings.use_embeddings
 
+    if followup is None:
+        followup = settings.research_followup
+
     queries = plan_questions(topic, client)
     hits, coverage, method = gather(queries, docs, client, semantic)
+    if followup:
+        hits, coverage = followup_round(coverage, hits, docs, client, semantic)
     base = {"topic": topic, "sub_questions": queries, "coverage": coverage, "retrieval": method}
     if not hits:
         return {**base, "report": NO_INFO, "sources": []}

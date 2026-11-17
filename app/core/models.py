@@ -115,6 +115,8 @@ class UserPrefDB(Base):
 
     user_id: Mapped[int] = mapped_column(primary_key=True)
     digest_enabled: Mapped[bool] = mapped_column(default=False)
+    telegram_chat_id: Mapped[str] = mapped_column(String(64), default="")
+    digest_hour: Mapped[Optional[int]] = mapped_column(nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
